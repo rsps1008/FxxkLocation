@@ -23,6 +23,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isMocking = MutableStateFlow(false)
     val isMocking = _isMocking.asStateFlow()
 
+    private val _isApplied = MutableStateFlow(false)
+    val isApplied = _isApplied.asStateFlow()
+
     private val _hasPermission = MutableStateFlow(false)
     val hasPermission = _hasPermission.asStateFlow()
 
@@ -32,6 +35,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isMockAppSet = MutableStateFlow(false)
     val isMockAppSet = _isMockAppSet.asStateFlow()
 
+    private val _isIgnoringBatteryOptimizations = MutableStateFlow(false)
+    val isIgnoringBatteryOptimizations = _isIgnoringBatteryOptimizations.asStateFlow()
+
     init {
         checkStatus()
     }
@@ -40,14 +46,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _hasPermission.value = SystemCheckUtil.hasLocationPermission(context)
         _isGpsEnabled.value = SystemCheckUtil.isGpsEnabled(context)
         _isMockAppSet.value = SystemCheckUtil.isMockLocationEnabled(context)
+        _isIgnoringBatteryOptimizations.value = SystemCheckUtil.isIgnoringBatteryOptimizations(context)
     }
 
     fun updateSelectedLocation(lat: Double, lng: Double) {
         selectedLocation = LocationData(lat, lng)
+        _isApplied.value = false
     }
 
     fun startMock() {
-        if (!_isMockAppSet.value || !_hasPermission.value) return
+        if (!_isMockAppSet.value || !_hasPermission.value || !_isIgnoringBatteryOptimizations.value) return
         
         val intent = Intent(context, MockLocationService::class.java).apply {
             action = MockLocationService.ACTION_START_MOCK
@@ -56,6 +64,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         context.startForegroundService(intent)
         _isMocking.value = true
+        _isApplied.value = true
     }
 
     fun stopMock() {
@@ -64,5 +73,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         context.startService(intent)
         _isMocking.value = false
+        _isApplied.value = false
     }
 }

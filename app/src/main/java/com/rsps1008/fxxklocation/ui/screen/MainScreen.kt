@@ -12,10 +12,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.rsps1008.fxxklocation.util.SystemCheckUtil
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.rsps1008.fxxklocation.viewmodel.MainViewModel
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
@@ -33,15 +34,52 @@ fun MainScreen(
 ) {
     val context = LocalContext.current
     val isMocking by viewModel.isMocking.collectAsState()
+    val isApplied by viewModel.isApplied.collectAsState()
     val hasPermission by viewModel.hasPermission.collectAsState()
     val isGpsEnabled by viewModel.isGpsEnabled.collectAsState()
     val isMockAppSet by viewModel.isMockAppSet.collectAsState()
+    val isIgnoringBatteryOptimizations by viewModel.isIgnoringBatteryOptimizations.collectAsState()
+    
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var showPermissionDialog by remember { mutableStateOf(false) }
 
     val selectedLoc = viewModel.selectedLocation
 
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.checkStatus()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     LaunchedEffect(Unit) {
-        viewModel.checkStatus()
         Configuration.getInstance().userAgentValue = context.packageName
+    }
+
+    if (showPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showPermissionDialog = false },
+            title = { Text("Permissions Required") },
+            text = { Text("To start mocking location, please ensure all system permissions and settings are correctly configured in the Settings page.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showPermissionDialog = false
+                    onNavigateToSettings()
+                }) {
+                    Text("Go to Settings")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPermissionDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -63,13 +101,6 @@ fun MainScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Status Section
-            StatusCard(hasPermission, isGpsEnabled, isMockAppSet, 
-                onOpenPermissions = { SystemCheckUtil.openAppSettings(context) },
-                onOpenGps = { SystemCheckUtil.openLocationSettings(context) },
-                onOpenDev = { SystemCheckUtil.openDevelopmentSettings(context) }
-            )
-
             // Map Section (OpenStreetMap)
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 AndroidView(
@@ -108,32 +139,22 @@ fun MainScreen(
                 )
             }
 
-            // Input Section
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = selectedLoc.latitude.toString(),
-                    onValueChange = { it.toDoubleOrNull()?.let { v -> viewModel.updateSelectedLocation(v, selectedLoc.longitude) } },
-                    label = { Text("Lat") },
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-                )
-                OutlinedTextField(
-                    value = selectedLoc.longitude.toString(),
-                    onValueChange = { it.toDoubleOrNull()?.let { v -> viewModel.updateSelectedLocation(selectedLoc.latitude, v) } },
-                    label = { Text("Lng") },
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-                )
-            }
-
             // Controls
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 LargeFloatingActionButton(
-                    onClick = { if (!isMocking && hasPermission && isMockAppSet) viewModel.startMock() },
-                    containerColor = if (isMocking || !hasPermission || !isMockAppSet) Color.LightGray else MaterialTheme.colorScheme.primaryContainer
+                    onClick = { 
+                        if (!isApplied) {
+                            if (hasPermission && isMockAppSet && isGpsEnabled && isIgnoringBatteryOptimizations) {
+                                viewModel.startMock()
+                            } else {
+                                showPermissionDialog = true
+                            }
+                        }
+                    },
+                    containerColor = if (isApplied) Color.LightGray else MaterialTheme.colorScheme.primaryContainer
                 ) {
                     Icon(Icons.Default.Check, "Start", modifier = Modifier.size(36.dp))
                 }
@@ -145,45 +166,6 @@ fun MainScreen(
                     Icon(Icons.Default.Close, "Stop", modifier = Modifier.size(36.dp))
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun StatusCard(
-    hasPermission: Boolean,
-    isGpsEnabled: Boolean,
-    isMockAppSet: Boolean,
-    onOpenPermissions: () -> Unit,
-    onOpenGps: () -> Unit,
-    onOpenDev: () -> Unit
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(8.dp)) {
-            StatusItem("Location Permission", hasPermission, onOpenPermissions)
-            StatusItem("GPS Enabled", isGpsEnabled, onOpenGps)
-            StatusItem("Mock App Selected", isMockAppSet, onOpenDev)
-        }
-    }
-}
-
-@Composable
-fun StatusItem(label: String, isOk: Boolean, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium)
-        Button(
-            onClick = onClick,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (isOk) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error
-            ),
-            modifier = Modifier.height(32.dp),
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-        ) {
-            Text(if (isOk) "OK" else "Fix", color = Color.White)
         }
     }
 }

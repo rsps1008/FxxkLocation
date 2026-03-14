@@ -67,7 +67,18 @@ class MockLocationService : Service() {
         mockLocationManager.startMock()
 
         mockJob = scope.launch {
+            // Update immediately on new center
+            val enableDriftOnStart = settingsStore.enableDrift.first()
+            val radiusOnStart = settingsStore.driftRadius.first()
+            val initialLocation = if (enableDriftOnStart) {
+                mockLocationManager.generateDriftLocation(center, radiusOnStart)
+            } else {
+                center
+            }
+            mockLocationManager.updateMockLocation(initialLocation)
+
             while (true) {
+                delay(2000)
                 val enableDrift = settingsStore.enableDrift.first()
                 val radius = settingsStore.driftRadius.first()
                 
@@ -78,7 +89,6 @@ class MockLocationService : Service() {
                 }
                 
                 mockLocationManager.updateMockLocation(locationToMock)
-                delay(2000)
             }
         }
     }
