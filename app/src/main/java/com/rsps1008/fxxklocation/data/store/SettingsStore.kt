@@ -16,6 +16,7 @@ class SettingsStore(private val context: Context) {
     companion object {
         val ENABLE_DRIFT = booleanPreferencesKey("enable_drift")
         val DRIFT_RADIUS = doublePreferencesKey("drift_radius")
+        val USE_GOOGLE_PLAY_SERVICES = booleanPreferencesKey("use_google_play_services")
     }
 
     val enableDrift: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -24,6 +25,10 @@ class SettingsStore(private val context: Context) {
 
     val driftRadius: Flow<Double> = context.dataStore.data.map { preferences ->
         preferences[DRIFT_RADIUS] ?: 10.0
+    }
+
+    val useGooglePlayServices: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[USE_GOOGLE_PLAY_SERVICES] ?: true
     }
 
     suspend fun setEnableDrift(enabled: Boolean) {
@@ -35,6 +40,12 @@ class SettingsStore(private val context: Context) {
     suspend fun setDriftRadius(radius: Double) {
         context.dataStore.edit { preferences ->
             preferences[DRIFT_RADIUS] = radius
+        }
+    }
+
+    suspend fun setUseGooglePlayServices(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[USE_GOOGLE_PLAY_SERVICES] = enabled
         }
     }
 }

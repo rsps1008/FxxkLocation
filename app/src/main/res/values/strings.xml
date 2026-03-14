@@ -17,9 +17,12 @@
     <string name="random_drift_desc">Slightly move the location every 2 seconds to simulate human behavior.</string>
     <string name="drift_radius_meters">Drift Radius (meters)</string>
     <string name="drift_radius_desc">The maximum distance the location can drift from the center.</string>
+    <string name="use_google_services">Use Google Services for Location</string>
+    <string name="use_google_services_desc">Get current location via Fused Location Provider (requires Google Play Services).</string>
     <string name="ok">OK</string>
     <string name="fix">Fix</string>
     <string name="back">Back</string>
+    <string name="locate_me">Locate Me</string>
     <string name="notification_title">Mock Location Running</string>
     <string name="notification_text">Mocking location updates&#8230;</string>
     <string name="notification_channel_name">Mock Location Service</string>

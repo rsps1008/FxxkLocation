@@ -22,6 +22,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val driftRadius: StateFlow<Double> = settingsStore.driftRadius
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 10.0)
 
+    val useGooglePlayServices: StateFlow<Boolean> = settingsStore.useGooglePlayServices
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
     private val _hasPermission = MutableStateFlow(false)
     val hasPermission = _hasPermission.asStateFlow()
 
@@ -54,6 +57,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setDriftRadius(radius: Double) {
         viewModelScope.launch {
             settingsStore.setDriftRadius(radius)
+        }
+    }
+
+    fun setUseGooglePlayServices(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsStore.setUseGooglePlayServices(enabled)
         }
     }
 }

@@ -30,6 +30,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val enableDrift by viewModel.enableDrift.collectAsState()
     val driftRadius by viewModel.driftRadius.collectAsState()
+    val useGooglePlayServices by viewModel.useGooglePlayServices.collectAsState()
     val hasPermission by viewModel.hasPermission.collectAsState()
     val isGpsEnabled by viewModel.isGpsEnabled.collectAsState()
     val isMockAppSet by viewModel.isMockAppSet.collectAsState()
@@ -119,6 +120,28 @@ fun SettingsScreen(
                     stringResource(R.string.drift_radius_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            HorizontalDivider()
+
+            // Google Services Selection
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.use_google_services), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(R.string.use_google_services_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = useGooglePlayServices,
+                    onCheckedChange = { viewModel.setUseGooglePlayServices(it) }
                 )
             }
         }

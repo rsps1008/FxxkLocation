@@ -29,6 +29,8 @@ class MockLocationService : Service() {
     companion object {
         const val ACTION_START_MOCK = "ACTION_START_MOCK"
         const val ACTION_STOP_MOCK = "ACTION_STOP_MOCK"
+        const val ACTION_PAUSE_MOCK = "ACTION_PAUSE_MOCK"
+        const val ACTION_RESUME_MOCK = "ACTION_RESUME_MOCK"
         const val EXTRA_LATITUDE = "EXTRA_LATITUDE"
         const val EXTRA_LONGITUDE = "EXTRA_LONGITUDE"
         private const val CHANNEL_ID = "MockLocationChannel"
@@ -43,22 +45,31 @@ class MockLocationService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent == null || intent.action == ACTION_STOP_MOCK) {
-            stopMocking()
-            return START_NOT_STICKY
-        }
+        if (intent == null) return START_NOT_STICKY
 
-        if (intent.action == ACTION_START_MOCK) {
-            val notification = createNotification()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
-            } else {
-                startForeground(NOTIFICATION_ID, notification)
+        when (intent.action) {
+            ACTION_STOP_MOCK -> {
+                stopMocking()
+                return START_NOT_STICKY
             }
+            ACTION_START_MOCK -> {
+                val notification = createNotification()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+                } else {
+                    startForeground(NOTIFICATION_ID, notification)
+                }
 
-            val lat = intent.getDoubleExtra(EXTRA_LATITUDE, 0.0)
-            val lng = intent.getDoubleExtra(EXTRA_LONGITUDE, 0.0)
-            startMocking(LocationData(lat, lng))
+                val lat = intent.getDoubleExtra(EXTRA_LATITUDE, 0.0)
+                val lng = intent.getDoubleExtra(EXTRA_LONGITUDE, 0.0)
+                startMocking(LocationData(lat, lng))
+            }
+            ACTION_PAUSE_MOCK -> {
+                mockLocationManager.stopMock()
+            }
+            ACTION_RESUME_MOCK -> {
+                mockLocationManager.startMock()
+            }
         }
         return START_STICKY
     }
