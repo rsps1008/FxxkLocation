@@ -17,6 +17,8 @@ class SettingsStore(private val context: Context) {
         val ENABLE_DRIFT = booleanPreferencesKey("enable_drift")
         val DRIFT_RADIUS = doublePreferencesKey("drift_radius")
         val USE_GOOGLE_PLAY_SERVICES = booleanPreferencesKey("use_google_play_services")
+        val LAST_LATITUDE = doublePreferencesKey("last_latitude")
+        val LAST_LONGITUDE = doublePreferencesKey("last_longitude")
     }
 
     val enableDrift: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -29,6 +31,14 @@ class SettingsStore(private val context: Context) {
 
     val useGooglePlayServices: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[USE_GOOGLE_PLAY_SERVICES] ?: true
+    }
+
+    val lastLatitude: Flow<Double?> = context.dataStore.data.map { preferences ->
+        preferences[LAST_LATITUDE]
+    }
+
+    val lastLongitude: Flow<Double?> = context.dataStore.data.map { preferences ->
+        preferences[LAST_LONGITUDE]
     }
 
     suspend fun setEnableDrift(enabled: Boolean) {
@@ -46,6 +56,13 @@ class SettingsStore(private val context: Context) {
     suspend fun setUseGooglePlayServices(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[USE_GOOGLE_PLAY_SERVICES] = enabled
+        }
+    }
+
+    suspend fun setLastLocation(lat: Double, lng: Double) {
+        context.dataStore.edit { preferences ->
+            preferences[LAST_LATITUDE] = lat
+            preferences[LAST_LONGITUDE] = lng
         }
     }
 }

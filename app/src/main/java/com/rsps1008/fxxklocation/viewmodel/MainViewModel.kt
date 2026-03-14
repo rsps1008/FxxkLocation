@@ -47,6 +47,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         checkStatus()
+        loadLastLocation()
+    }
+
+    private fun loadLastLocation() {
+        viewModelScope.launch {
+            val lastLat = settingsStore.lastLatitude.first()
+            val lastLng = settingsStore.lastLongitude.first()
+            if (lastLat != null && lastLng != null) {
+                selectedLocation = LocationData(lastLat, lastLng)
+            }
+        }
     }
 
     fun checkStatus() {
@@ -59,6 +70,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun updateSelectedLocation(lat: Double, lng: Double) {
         selectedLocation = LocationData(lat, lng)
         _isApplied.value = false
+        viewModelScope.launch {
+            settingsStore.setLastLocation(lat, lng)
+        }
     }
 
     @SuppressLint("MissingPermission")
