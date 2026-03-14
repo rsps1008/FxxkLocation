@@ -11,11 +11,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.rsps1008.fxxklocation.R
 import com.rsps1008.fxxklocation.util.SystemCheckUtil
 import com.rsps1008.fxxklocation.viewmodel.SettingsViewModel
 
@@ -50,10 +52,10 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = { Text(stringResource(R.string.settings)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 }
             )
@@ -68,13 +70,13 @@ fun SettingsScreen(
         ) {
             // Permissions Section
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("System Permissions", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.system_permissions), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(8.dp)) {
-                        StatusItem("Location Permission", hasPermission) { SystemCheckUtil.openAppSettings(context) }
-                        StatusItem("GPS Enabled", isGpsEnabled) { SystemCheckUtil.openLocationSettings(context) }
-                        StatusItem("Mock App Selected", isMockAppSet) { SystemCheckUtil.openDevelopmentSettings(context) }
-                        StatusItem("Ignore Battery Optimization", isIgnoringBatteryOptimizations) { SystemCheckUtil.openBatteryOptimizationSettings(context) }
+                        StatusItem(stringResource(R.string.location_permission), hasPermission) { SystemCheckUtil.openAppSettings(context) }
+                        StatusItem(stringResource(R.string.gps_enabled), isGpsEnabled) { SystemCheckUtil.openLocationSettings(context) }
+                        StatusItem(stringResource(R.string.mock_app_selected), isMockAppSet) { SystemCheckUtil.openDevelopmentSettings(context) }
+                        StatusItem(stringResource(R.string.ignore_battery_optimization), isIgnoringBatteryOptimizations) { SystemCheckUtil.openBatteryOptimizationSettings(context) }
                     }
                 }
             }
@@ -88,9 +90,9 @@ fun SettingsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Random Drift", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.random_drift), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Slightly move the location every 2 seconds to simulate human behavior.",
+                        stringResource(R.string.random_drift_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -103,7 +105,7 @@ fun SettingsScreen(
 
             // Drift Radius Input
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Drift Radius (meters)", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.drift_radius_meters), style = MaterialTheme.typography.titleMedium)
                 OutlinedTextField(
                     value = driftRadius.toString(),
                     onValueChange = { 
@@ -114,7 +116,7 @@ fun SettingsScreen(
                     enabled = enableDrift
                 )
                 Text(
-                    "The maximum distance the location can drift from the center.",
+                    stringResource(R.string.drift_radius_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -139,7 +141,7 @@ private fun StatusItem(label: String, isOk: Boolean, onClick: () -> Unit) {
             modifier = Modifier.height(32.dp),
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
         ) {
-            Text(if (isOk) "OK" else "Fix", color = Color.White)
+            Text(if (isOk) stringResource(R.string.ok) else stringResource(R.string.fix), color = Color.White)
         }
     }
 }

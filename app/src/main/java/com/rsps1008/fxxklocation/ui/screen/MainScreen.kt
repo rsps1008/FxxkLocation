@@ -14,10 +14,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.rsps1008.fxxklocation.R
 import com.rsps1008.fxxklocation.viewmodel.MainViewModel
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
@@ -74,19 +76,19 @@ fun MainScreen(
     if (showPermissionDialog) {
         AlertDialog(
             onDismissRequest = { showPermissionDialog = false },
-            title = { Text("Permissions Required") },
-            text = { Text("To start mocking location, please ensure all system permissions and settings are correctly configured in the Settings page.") },
+            title = { Text(stringResource(R.string.permissions_required)) },
+            text = { Text(stringResource(R.string.permissions_message)) },
             confirmButton = {
                 TextButton(onClick = {
                     showPermissionDialog = false
                     onNavigateToSettings()
                 }) {
-                    Text("Go to Settings")
+                    Text(stringResource(R.string.go_to_settings))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showPermissionDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
@@ -95,10 +97,10 @@ fun MainScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Fxxk Location") },
+                title = { Text(stringResource(R.string.app_name)) },
                 actions = {
                     IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings))
                     }
                 }
             )
@@ -132,7 +134,7 @@ fun MainScreen(
                             val marker = Marker(this)
                             marker.position = GeoPoint(selectedLoc.latitude, selectedLoc.longitude)
                             marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                            marker.title = "Target Location"
+                            marker.title = context.getString(R.string.target_location)
                             overlays.add(marker)
 
                             val eventsOverlay = MapEventsOverlay(object : MapEventsReceiver {
@@ -175,14 +177,14 @@ fun MainScreen(
                     },
                     containerColor = if (isApplied) Color.LightGray else MaterialTheme.colorScheme.primaryContainer
                 ) {
-                    Icon(Icons.Default.Check, "Start", modifier = Modifier.size(36.dp))
+                    Icon(Icons.Default.Check, stringResource(R.string.start), modifier = Modifier.size(36.dp))
                 }
 
                 LargeFloatingActionButton(
                     onClick = { if (isMocking) viewModel.stopMock() },
                     containerColor = if (isMocking) MaterialTheme.colorScheme.errorContainer else Color.LightGray
                 ) {
-                    Icon(Icons.Default.Close, "Stop", modifier = Modifier.size(36.dp))
+                    Icon(Icons.Default.Close, stringResource(R.string.stop), modifier = Modifier.size(36.dp))
                 }
             }
         }

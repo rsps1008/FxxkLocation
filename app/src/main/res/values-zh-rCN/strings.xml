@@ -1,0 +1,26 @@
+<resources>
+    <string name="app_name">Fxxk Location</string>
+    <string name="permissions_required">需要权限</string>
+    <string name="permissions_message">若要开始模拟位置，请确保在设置页面中已正确配置所有系统权限。</string>
+    <string name="go_to_settings">前往设置</string>
+    <string name="cancel">取消</string>
+    <string name="settings">设置</string>
+    <string name="target_location">目标位置</string>
+    <string name="start">开始</string>
+    <string name="stop">停止</string>
+    <string name="system_permissions">系统权限</string>
+    <string name="location_permission">位置权限</string>
+    <string name="gps_enabled">GPS 已开启</string>
+    <string name="mock_app_selected">已选择模拟应用程序</string>
+    <string name="ignore_battery_optimization">忽略电池优化</string>
+    <string name="random_drift">随机漂移</string>
+    <string name="random_drift_desc">每 2 秒微调位置以模拟真实人类行为。</string>
+    <string name="drift_radius_meters">漂移半径（米）</string>
+    <string name="drift_radius_desc">位置与中心点的最大漂移距离。</string>
+    <string name="ok">正常</string>
+    <string name="fix">修复</string>
+    <string name="back">返回</string>
+    <string name="notification_title">模拟位置运行中</string>
+    <string name="notification_text">正在模拟位置更新…</string>
+    <string name="notification_channel_name">模拟位置服务</string>
+</resources>
