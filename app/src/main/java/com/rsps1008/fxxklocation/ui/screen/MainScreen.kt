@@ -1,6 +1,7 @@
 package com.rsps1008.fxxklocation.ui.screen
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -42,18 +43,27 @@ fun MainScreen(
     
     val lifecycleOwner = LocalLifecycleOwner.current
     var showPermissionDialog by remember { mutableStateOf(false) }
+    val mapViewRef = remember { mutableStateOf<MapView?>(null) }
 
     val selectedLoc = viewModel.selectedLocation
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.checkStatus()
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    viewModel.checkStatus()
+                    mapViewRef.value?.onResume()
+                }
+                Lifecycle.Event.ON_PAUSE -> {
+                    mapViewRef.value?.onPause()
+                }
+                else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            mapViewRef.value?.onDetach()
         }
     }
 
@@ -102,12 +112,20 @@ fun MainScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Map Section (OpenStreetMap)
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            ElevatedCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+            ) {
                 AndroidView(
                     factory = { ctx ->
                         MapView(ctx).apply {
                             setTileSource(TileSourceFactory.MAPNIK)
                             setMultiTouchControls(true)
+                            setTilesScaledToDpi(true)
+                            setBackgroundColor(android.graphics.Color.WHITE)
                             controller.setZoom(15.0)
                             controller.setCenter(GeoPoint(selectedLoc.latitude, selectedLoc.longitude))
                             
@@ -127,6 +145,7 @@ fun MainScreen(
                                 override fun longPressHelper(p: GeoPoint): Boolean = false
                             })
                             overlays.add(eventsOverlay)
+                            mapViewRef.value = this
                         }
                     },
                     update = { mapView ->
