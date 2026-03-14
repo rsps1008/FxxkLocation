@@ -48,15 +48,90 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     init {
         checkStatus()
         loadLastLocation()
+        syncMockingStatus()
+    }
+
+    private fun syncMockingStatus() {
+        viewModelScope.launch {
+            settingsStore.isMocking.collect { mocking ->
+                _isMocking.value = mocking
+                if (!mocking) {
+                    _isApplied.value = false
+                }
+            }
+        }
     }
 
     private fun loadLastLocation() {
         viewModelScope.launch {
             val lastLat = settingsStore.lastLatitude.first()
             val lastLng = settingsStore.lastLongitude.first()
+            val lastAlt = settingsStore.lastAltitudeValue.first()
             if (lastLat != null && lastLng != null) {
-                selectedLocation = LocationData(lastLat, lastLng)
+                selectedLocation = LocationData(lastLat, lastLng, lastAlt)
             }
+
+            // If "use real altitude" is enabled, refresh it on start
+            if (settingsStore.useRealAltitude.first()) {
+                refreshRealAltitude()
+            }
+        }
+    }
+
+    private fun refreshRealAltitude() {
+        if (!_hasPermission.value) return
+        
+        viewModelScope.launch {
+            val wasMocking = _isMocking.value
+            if (wasMocking) {
+                val pauseIntent = Intent(context, MockLocationService::class.java).apply {
+                    action = MockLocationService.ACTION_PAUSE_MOCK
+                }
+                context.startService(pauseIntent)
+                delay(500) 
+            }
+
+            val useFLP = settingsStore.useGooglePlayServices.first()
+            if (useFLP) {
+                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+                try {
+                    fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                        location?.let {
+                            updateAltitude(it.altitude)
+                        }
+                        resumeMockIfNeeded(wasMocking)
+                    }.addOnFailureListener {
+                        resumeMockIfNeeded(wasMocking)
+                    }
+                } catch (e: SecurityException) {
+                    resumeMockIfNeeded(wasMocking)
+                }
+            } else {
+                val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
+                try {
+                    val providers = locationManager.getProviders(true)
+                    var bestAltitude = 3.0
+                    var found = false
+                    for (provider in providers) {
+                        val l = locationManager.getLastKnownLocation(provider) ?: continue
+                        bestAltitude = l.altitude
+                        found = true
+                        break
+                    }
+                    if (found) {
+                        updateAltitude(bestAltitude)
+                    }
+                } catch (e: SecurityException) {
+                }
+                resumeMockIfNeeded(wasMocking)
+            }
+        }
+    }
+
+    private fun updateAltitude(altitude: Double) {
+        selectedLocation = selectedLocation.copy(altitude = altitude)
+        viewModelScope.launch {
+            settingsStore.setLastAltitudeValue(altitude)
         }
     }
 
@@ -68,7 +143,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateSelectedLocation(lat: Double, lng: Double) {
-        selectedLocation = LocationData(lat, lng)
+        selectedLocation = selectedLocation.copy(latitude = lat, longitude = lng)
         _isApplied.value = false
         viewModelScope.launch {
             settingsStore.setLastLocation(lat, lng)
@@ -120,6 +195,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun processNewLocation(location: android.location.Location?, wasMocking: Boolean) {
         location?.let {
             updateSelectedLocation(it.latitude, it.longitude)
+            val altitudeToUse = it.altitude
+            updateAltitude(altitudeToUse)
             
             // 3. Resume mock with NEW location if it was active
             if (wasMocking) {
@@ -127,6 +204,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     action = MockLocationService.ACTION_START_MOCK
                     putExtra(MockLocationService.EXTRA_LATITUDE, it.latitude)
                     putExtra(MockLocationService.EXTRA_LONGITUDE, it.longitude)
+                    putExtra(MockLocationService.EXTRA_ALTITUDE, altitudeToUse)
                 }
                 context.startService(resumeIntent)
             }
@@ -137,10 +215,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun resumeMockIfNeeded(wasMocking: Boolean) {
         if (wasMocking) {
-            val resumeIntent = Intent(context, MockLocationService::class.java).apply {
-                action = MockLocationService.ACTION_RESUME_MOCK
+            viewModelScope.launch {
+                val lastLat = settingsStore.lastLatitude.first() ?: return@launch
+                val lastLng = settingsStore.lastLongitude.first() ?: return@launch
+                val lastAlt = settingsStore.lastAltitudeValue.first()
+                
+                val intent = Intent(context, MockLocationService::class.java).apply {
+                    action = MockLocationService.ACTION_START_MOCK
+                    putExtra(MockLocationService.EXTRA_LATITUDE, lastLat)
+                    putExtra(MockLocationService.EXTRA_LONGITUDE, lastLng)
+                    putExtra(MockLocationService.EXTRA_ALTITUDE, lastAlt)
+                }
+                context.startForegroundService(intent)
             }
-            context.startService(resumeIntent)
         }
     }
 
@@ -151,9 +238,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             action = MockLocationService.ACTION_START_MOCK
             putExtra(MockLocationService.EXTRA_LATITUDE, selectedLocation.latitude)
             putExtra(MockLocationService.EXTRA_LONGITUDE, selectedLocation.longitude)
+            putExtra(MockLocationService.EXTRA_ALTITUDE, selectedLocation.altitude)
         }
         context.startForegroundService(intent)
-        _isMocking.value = true
+        viewModelScope.launch {
+            settingsStore.setIsMocking(true)
+        }
         _isApplied.value = true
     }
 
@@ -162,7 +252,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             action = MockLocationService.ACTION_STOP_MOCK
         }
         context.startService(intent)
-        _isMocking.value = false
+        viewModelScope.launch {
+            settingsStore.setIsMocking(false)
+        }
         _isApplied.value = false
     }
 }

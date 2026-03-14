@@ -3,12 +3,17 @@ package com.rsps1008.fxxklocation.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import android.content.Intent
+import com.google.android.gms.location.LocationServices
 import com.rsps1008.fxxklocation.data.store.SettingsStore
+import com.rsps1008.fxxklocation.service.MockLocationService
 import com.rsps1008.fxxklocation.util.SystemCheckUtil
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -24,6 +29,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     val useGooglePlayServices: StateFlow<Boolean> = settingsStore.useGooglePlayServices
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val useRealAltitude: StateFlow<Boolean> = settingsStore.useRealAltitude
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val lastAltitude: StateFlow<Double> = settingsStore.lastAltitudeValue
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 3.0)
 
     private val _hasPermission = MutableStateFlow(false)
     val hasPermission = _hasPermission.asStateFlow()
@@ -46,6 +57,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         _isGpsEnabled.value = SystemCheckUtil.isGpsEnabled(context)
         _isMockAppSet.value = SystemCheckUtil.isMockLocationEnabled(context)
         _isIgnoringBatteryOptimizations.value = SystemCheckUtil.isIgnoringBatteryOptimizations(context)
+        
+        viewModelScope.launch {
+            if (settingsStore.useRealAltitude.first()) {
+                refreshAltitude()
+            }
+        }
     }
 
     fun setEnableDrift(enabled: Boolean) {
@@ -63,6 +80,88 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setUseGooglePlayServices(enabled: Boolean) {
         viewModelScope.launch {
             settingsStore.setUseGooglePlayServices(enabled)
+        }
+    }
+
+    fun setUseRealAltitude(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsStore.setUseRealAltitude(enabled)
+            if (enabled) {
+                refreshAltitude()
+            }
+        }
+    }
+
+    private fun refreshAltitude() {
+        if (!_hasPermission.value) return
+        
+        viewModelScope.launch {
+            // To get real location, we need to pause mock
+            val pauseIntent = Intent(context, MockLocationService::class.java).apply {
+                action = MockLocationService.ACTION_PAUSE_MOCK
+            }
+            context.startService(pauseIntent)
+            delay(500) 
+
+            val useFLP = settingsStore.useGooglePlayServices.first()
+            if (useFLP) {
+                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+                try {
+                    fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                        location?.let {
+                            saveAltitude(it.altitude)
+                        }
+                        resumeMock()
+                    }.addOnFailureListener {
+                        resumeMock()
+                    }
+                } catch (e: SecurityException) {
+                    resumeMock()
+                }
+            } else {
+                val locationManager = context.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager
+                try {
+                    val providers = locationManager.getProviders(true)
+                    var bestAltitude = 3.0
+                    var found = false
+                    for (provider in providers) {
+                        val l = locationManager.getLastKnownLocation(provider) ?: continue
+                        bestAltitude = l.altitude
+                        found = true
+                        break
+                    }
+                    if (found) {
+                        saveAltitude(bestAltitude)
+                    }
+                } catch (e: SecurityException) {
+                }
+                resumeMock()
+            }
+        }
+    }
+
+    private fun saveAltitude(altitude: Double) {
+        viewModelScope.launch {
+            settingsStore.setLastAltitudeValue(altitude)
+        }
+    }
+
+    private fun resumeMock() {
+        viewModelScope.launch {
+            val isMocking = settingsStore.isMocking.first()
+            if (!isMocking) return@launch
+
+            val lat = settingsStore.lastLatitude.first() ?: return@launch
+            val lng = settingsStore.lastLongitude.first() ?: return@launch
+            val alt = settingsStore.lastAltitudeValue.first()
+            
+            val intent = Intent(context, MockLocationService::class.java).apply {
+                action = MockLocationService.ACTION_START_MOCK
+                putExtra(MockLocationService.EXTRA_LATITUDE, lat)
+                putExtra(MockLocationService.EXTRA_LONGITUDE, lng)
+                putExtra(MockLocationService.EXTRA_ALTITUDE, alt)
+            }
+            context.startForegroundService(intent)
         }
     }
 }

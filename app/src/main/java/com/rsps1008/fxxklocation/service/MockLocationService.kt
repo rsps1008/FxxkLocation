@@ -33,6 +33,7 @@ class MockLocationService : Service() {
         const val ACTION_RESUME_MOCK = "ACTION_RESUME_MOCK"
         const val EXTRA_LATITUDE = "EXTRA_LATITUDE"
         const val EXTRA_LONGITUDE = "EXTRA_LONGITUDE"
+        const val EXTRA_ALTITUDE = "EXTRA_ALTITUDE"
         private const val CHANNEL_ID = "MockLocationChannel"
         private const val NOTIFICATION_ID = 1
     }
@@ -62,7 +63,8 @@ class MockLocationService : Service() {
 
                 val lat = intent.getDoubleExtra(EXTRA_LATITUDE, 0.0)
                 val lng = intent.getDoubleExtra(EXTRA_LONGITUDE, 0.0)
-                startMocking(LocationData(lat, lng))
+                val alt = intent.getDoubleExtra(EXTRA_ALTITUDE, 0.0)
+                startMocking(LocationData(lat, lng, alt))
             }
             ACTION_PAUSE_MOCK -> {
                 mockLocationManager.stopMock()

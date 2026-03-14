@@ -19,6 +19,9 @@
     <string name="drift_radius_desc">The maximum distance the location can drift from the center.</string>
     <string name="use_google_services">Use Google Services for Location</string>
     <string name="use_google_services_desc">Get current location via Fused Location Provider (requires Google Play Services).</string>
+    <string name="use_real_altitude">Use Real Altitude</string>
+    <string name="use_real_altitude_desc">Get real altitude from current location when starting mock or toggling this setting.</string>
+    <string name="current_altitude">Current Altitude: %.2f m</string>
     <string name="ok">OK</string>
     <string name="fix">Fix</string>
     <string name="back">Back</string>

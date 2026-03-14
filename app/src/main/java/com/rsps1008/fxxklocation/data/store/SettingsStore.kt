@@ -17,8 +17,11 @@ class SettingsStore(private val context: Context) {
         val ENABLE_DRIFT = booleanPreferencesKey("enable_drift")
         val DRIFT_RADIUS = doublePreferencesKey("drift_radius")
         val USE_GOOGLE_PLAY_SERVICES = booleanPreferencesKey("use_google_play_services")
+        val USE_REAL_ALTITUDE = booleanPreferencesKey("use_real_altitude")
         val LAST_LATITUDE = doublePreferencesKey("last_latitude")
         val LAST_LONGITUDE = doublePreferencesKey("last_longitude")
+        val LAST_ALTITUDE_VALUE = doublePreferencesKey("last_altitude_value")
+        val IS_MOCKING = booleanPreferencesKey("is_mocking")
     }
 
     val enableDrift: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -33,12 +36,24 @@ class SettingsStore(private val context: Context) {
         preferences[USE_GOOGLE_PLAY_SERVICES] ?: true
     }
 
+    val useRealAltitude: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[USE_REAL_ALTITUDE] ?: false
+    }
+
     val lastLatitude: Flow<Double?> = context.dataStore.data.map { preferences ->
         preferences[LAST_LATITUDE]
     }
 
     val lastLongitude: Flow<Double?> = context.dataStore.data.map { preferences ->
         preferences[LAST_LONGITUDE]
+    }
+
+    val lastAltitudeValue: Flow<Double> = context.dataStore.data.map { preferences ->
+        preferences[LAST_ALTITUDE_VALUE] ?: 3.0
+    }
+
+    val isMocking: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[IS_MOCKING] ?: false
     }
 
     suspend fun setEnableDrift(enabled: Boolean) {
@@ -59,10 +74,28 @@ class SettingsStore(private val context: Context) {
         }
     }
 
+    suspend fun setUseRealAltitude(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[USE_REAL_ALTITUDE] = enabled
+        }
+    }
+
     suspend fun setLastLocation(lat: Double, lng: Double) {
         context.dataStore.edit { preferences ->
             preferences[LAST_LATITUDE] = lat
             preferences[LAST_LONGITUDE] = lng
+        }
+    }
+
+    suspend fun setLastAltitudeValue(altitude: Double) {
+        context.dataStore.edit { preferences ->
+            preferences[LAST_ALTITUDE_VALUE] = altitude
+        }
+    }
+
+    suspend fun setIsMocking(mocking: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[IS_MOCKING] = mocking
         }
     }
 }

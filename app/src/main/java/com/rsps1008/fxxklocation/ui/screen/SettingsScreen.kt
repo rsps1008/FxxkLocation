@@ -31,6 +31,8 @@ fun SettingsScreen(
     val enableDrift by viewModel.enableDrift.collectAsState()
     val driftRadius by viewModel.driftRadius.collectAsState()
     val useGooglePlayServices by viewModel.useGooglePlayServices.collectAsState()
+    val useRealAltitude by viewModel.useRealAltitude.collectAsState()
+    val lastAltitude by viewModel.lastAltitude.collectAsState()
     val hasPermission by viewModel.hasPermission.collectAsState()
     val isGpsEnabled by viewModel.isGpsEnabled.collectAsState()
     val isMockAppSet by viewModel.isMockAppSet.collectAsState()
@@ -142,6 +144,36 @@ fun SettingsScreen(
                 Switch(
                     checked = useGooglePlayServices,
                     onCheckedChange = { viewModel.setUseGooglePlayServices(it) }
+                )
+            }
+
+            HorizontalDivider()
+
+            // Real Altitude Selection
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.use_real_altitude), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(R.string.use_real_altitude_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (useRealAltitude) {
+                        Text(
+                            stringResource(R.string.current_altitude, lastAltitude),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                Switch(
+                    checked = useRealAltitude,
+                    onCheckedChange = { viewModel.setUseRealAltitude(it) }
                 )
             }
         }

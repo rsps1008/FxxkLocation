@@ -19,6 +19,9 @@
     <string name="drift_radius_desc">位置与中心点的最大漂移距离。</string>
     <string name="use_google_services">使用 Google 服务定位</string>
     <string name="use_google_services_desc">通过 Fused Location Provider 获取当前位置（需 Google Play 服务）。</string>
+    <string name="use_real_altitude">使用真实高度</string>
+    <string name="use_real_altitude_desc">开启模拟或切换此设置时，從目前位置获取真实高度。</string>
+    <string name="current_altitude">当前高度：%.2f 米</string>
     <string name="ok">正常</string>
     <string name="fix">修复</string>
     <string name="back">返回</string>

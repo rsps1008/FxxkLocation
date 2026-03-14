@@ -44,7 +44,7 @@ class MockLocationManager(private val context: Context) {
         val mockLocation = Location(providerName).apply {
             latitude = locationData.latitude
             longitude = locationData.longitude
-            altitude = 3.0
+            altitude = locationData.altitude
             time = System.currentTimeMillis()
             accuracy = 1.0f
             elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
@@ -66,6 +66,6 @@ class MockLocationManager(private val context: Context) {
         val y = w * sin(t)
 
         val newLongitude = x / cos(Math.toRadians(center.latitude))
-        return LocationData(center.latitude + y, center.longitude + newLongitude)
+        return LocationData(center.latitude + y, center.longitude + newLongitude, center.altitude)
     }
 }
