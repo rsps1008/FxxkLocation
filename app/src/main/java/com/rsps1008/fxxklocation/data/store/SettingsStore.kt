@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -22,6 +23,8 @@ class SettingsStore(private val context: Context) {
         val LAST_LONGITUDE = doublePreferencesKey("last_longitude")
         val LAST_ALTITUDE_VALUE = doublePreferencesKey("last_altitude_value")
         val IS_MOCKING = booleanPreferencesKey("is_mocking")
+        val ENABLE_AUTO_STOP = booleanPreferencesKey("enable_auto_stop")
+        val AUTO_STOP_MINUTES = intPreferencesKey("auto_stop_minutes")
     }
 
     val enableDrift: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -54,6 +57,14 @@ class SettingsStore(private val context: Context) {
 
     val isMocking: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[IS_MOCKING] ?: false
+    }
+
+    val enableAutoStop: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[ENABLE_AUTO_STOP] ?: false
+    }
+
+    val autoStopMinutes: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[AUTO_STOP_MINUTES] ?: 30
     }
 
     suspend fun setEnableDrift(enabled: Boolean) {
@@ -96,6 +107,18 @@ class SettingsStore(private val context: Context) {
     suspend fun setIsMocking(mocking: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[IS_MOCKING] = mocking
+        }
+    }
+
+    suspend fun setEnableAutoStop(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[ENABLE_AUTO_STOP] = enabled
+        }
+    }
+
+    suspend fun setAutoStopMinutes(minutes: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[AUTO_STOP_MINUTES] = minutes
         }
     }
 }

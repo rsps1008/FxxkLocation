@@ -1,6 +1,8 @@
 package com.rsps1008.fxxklocation.ui.screen
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -33,6 +35,8 @@ fun SettingsScreen(
     val useGooglePlayServices by viewModel.useGooglePlayServices.collectAsState()
     val useRealAltitude by viewModel.useRealAltitude.collectAsState()
     val lastAltitude by viewModel.lastAltitude.collectAsState()
+    val enableAutoStop by viewModel.enableAutoStop.collectAsState()
+    val autoStopMinutes by viewModel.autoStopMinutes.collectAsState()
     val hasPermission by viewModel.hasPermission.collectAsState()
     val hasNotificationPermission by viewModel.hasNotificationPermission.collectAsState()
     val isGpsEnabled by viewModel.isGpsEnabled.collectAsState()
@@ -41,6 +45,7 @@ fun SettingsScreen(
 
     var driftRadiusInput by remember { mutableStateOf("") }
     var manualAltitudeInput by remember { mutableStateOf("") }
+    var autoStopMinutesInput by remember { mutableStateOf("") }
     
     // Sync string state with Double state if it changes from outside
     LaunchedEffect(driftRadius) {
@@ -61,6 +66,13 @@ fun SettingsScreen(
             } else {
                 lastAltitude.toString()
             }
+        }
+    }
+
+    // Sync auto stop minutes input
+    LaunchedEffect(autoStopMinutes) {
+        if (autoStopMinutes.toString() != autoStopMinutesInput) {
+            autoStopMinutesInput = autoStopMinutes.toString()
         }
     }
 
@@ -94,6 +106,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
@@ -216,6 +229,43 @@ fun SettingsScreen(
                         label = { Text(stringResource(R.string.manual_altitude)) },
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                    )
+                }
+            }
+
+            HorizontalDivider()
+
+            // Auto-stop Section
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.auto_stop), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(R.string.auto_stop_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = enableAutoStop,
+                        onCheckedChange = { viewModel.setEnableAutoStop(it) }
+                    )
+                }
+
+                if (enableAutoStop) {
+                    OutlinedTextField(
+                        value = autoStopMinutesInput,
+                        onValueChange = {
+                            autoStopMinutesInput = it
+                            it.toIntOrNull()?.let { minutes -> viewModel.setAutoStopMinutes(minutes) }
+                        },
+                        label = { Text(stringResource(R.string.stop_after_minutes)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                 }
             }

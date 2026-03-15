@@ -23,6 +23,9 @@
     <string name="use_real_altitude">Use Real Altitude</string>
     <string name="use_real_altitude_desc">Get real altitude from current location when starting mock or toggling this setting.</string>
     <string name="manual_altitude">Manual Altitude (meters)</string>
+    <string name="auto_stop">Auto-stop Mocking</string>
+    <string name="auto_stop_desc">Automatically stop mocking after a set time.</string>
+    <string name="stop_after_minutes">Stop after (minutes)</string>
     <string name="current_altitude">Current Altitude: %.2f m</string>
     <string name="ok">OK</string>
     <string name="fix">Fix</string>

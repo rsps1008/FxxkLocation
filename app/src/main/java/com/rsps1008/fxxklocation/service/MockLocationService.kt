@@ -84,6 +84,18 @@ class MockLocationService : Service() {
         mockLocationManager.startMock()
 
         mockJob = scope.launch {
+            // Auto-stop logic
+            launch {
+                val autoStop = settingsStore.enableAutoStop.first()
+                if (autoStop) {
+                    val minutes = settingsStore.autoStopMinutes.first()
+                    if (minutes > 0) {
+                        delay(minutes * 60L * 1000L)
+                        stopMocking()
+                    }
+                }
+            }
+
             // Dynamically update altitude if it's changed in Settings or via real-refresh while mocking
             launch {
                 settingsStore.lastAltitudeValue.collect { alt ->

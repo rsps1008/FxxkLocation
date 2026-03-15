@@ -38,6 +38,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val lastAltitude: StateFlow<Double> = settingsStore.lastAltitudeValue
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 3.0)
 
+    val enableAutoStop: StateFlow<Boolean> = settingsStore.enableAutoStop
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val autoStopMinutes: StateFlow<Int> = settingsStore.autoStopMinutes
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 30)
+
     private val _hasPermission = MutableStateFlow(false)
     val hasPermission = _hasPermission.asStateFlow()
 
@@ -101,6 +107,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setManualAltitude(altitude: Double) {
         viewModelScope.launch {
             settingsStore.setLastAltitudeValue(altitude)
+        }
+    }
+
+    fun setEnableAutoStop(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsStore.setEnableAutoStop(enabled)
+        }
+    }
+
+    fun setAutoStopMinutes(minutes: Int) {
+        viewModelScope.launch {
+            settingsStore.setAutoStopMinutes(minutes)
         }
     }
 

@@ -23,6 +23,9 @@
     <string name="use_real_altitude">使用真实高度</string>
     <string name="use_real_altitude_desc">开启模拟或切换此设置时，從目前位置获取真实高度。</string>
     <string name="manual_altitude">手动设定高度（米）</string>
+    <string name="auto_stop">自动停止模拟</string>
+    <string name="auto_stop_desc">在设定的时间后自动停止模拟位置。</string>
+    <string name="stop_after_minutes">几分钟后停止（分钟）</string>
     <string name="current_altitude">当前高度：%.2f 米</string>
     <string name="ok">正常</string>
     <string name="fix">修复</string>
