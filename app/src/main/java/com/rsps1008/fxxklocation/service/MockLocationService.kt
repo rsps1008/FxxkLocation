@@ -151,10 +151,14 @@ class MockLocationService : Service() {
             getString(R.string.notification_text)
         }
 
+        // 取得 App 圖示作為大圖標
+        //val appIcon = android.graphics.BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.notification_title))
             .setContentText(contentText)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_stat_name)
+            //.setLargeIcon(appIcon)
             .setContentIntent(mainPendingIntent)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, getString(R.string.stop), stopPendingIntent)
             .setOngoing(true)
