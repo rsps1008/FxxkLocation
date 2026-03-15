@@ -15,7 +15,7 @@
     <string name="mock_app_selected">Mock App Selected</string>
     <string name="ignore_battery_optimization">Ignore Battery Optimization</string>
     <string name="random_drift">Random Drift</string>
-    <string name="random_drift_desc">Slightly move the location every 2 seconds to simulate human behavior.</string>
+    <string name="random_drift_desc">Slightly move the location and altitude every 2 seconds to simulate realistic human behavior.</string>
     <string name="drift_radius_meters">Drift Radius (meters)</string>
     <string name="drift_radius_desc">The maximum distance the location can drift from the center.</string>
     <string name="use_google_services">Use Google Services for Location</string>

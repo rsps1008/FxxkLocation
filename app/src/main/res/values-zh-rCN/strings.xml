@@ -15,7 +15,7 @@
     <string name="mock_app_selected">已选择模拟应用程序</string>
     <string name="ignore_battery_optimization">忽略电池优化</string>
     <string name="random_drift">随机漂移</string>
-    <string name="random_drift_desc">每 2 秒微调位置以模拟真实人类行为。</string>
+    <string name="random_drift_desc">每 2 秒微调位置与高度以模拟更真实的人類行为。</string>
     <string name="drift_radius_meters">漂移半径（米）</string>
     <string name="drift_radius_desc">位置与中心点的最大漂移距离。</string>
     <string name="use_google_services">使用 Google 服务定位</string>

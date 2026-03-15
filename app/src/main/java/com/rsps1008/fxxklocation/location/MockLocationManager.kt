@@ -111,6 +111,11 @@ class MockLocationManager(private val context: Context) {
         val y = w * sin(t)
 
         val newLongitude = x / cos(Math.toRadians(center.latitude))
-        return LocationData(center.latitude + y, center.longitude + newLongitude, center.altitude)
+        
+        // Add a small random altitude drift (±0.2 meters)
+        val altDrift = (Math.random() - 0.5) * 0.4 
+        val newAltitude = center.altitude + altDrift
+
+        return LocationData(center.latitude + y, center.longitude + newLongitude, newAltitude)
     }
 }
