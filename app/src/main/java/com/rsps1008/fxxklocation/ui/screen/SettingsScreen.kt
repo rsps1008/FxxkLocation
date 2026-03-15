@@ -111,7 +111,7 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            // Permissions Section
+            // 0. Permissions Section
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.system_permissions), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Card(modifier = Modifier.fillMaxWidth()) {
@@ -127,71 +127,110 @@ fun SettingsScreen(
 
             HorizontalDivider()
 
-            // Random Drift Switch
+            // 1. Auto-start Section
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.random_drift), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.auto_start_launch), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        stringResource(R.string.random_drift_desc),
+                        stringResource(R.string.auto_start_launch_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Switch(
-                    checked = enableDrift,
-                    onCheckedChange = { viewModel.setEnableDrift(it) }
+                    checked = autoStartOnLaunch,
+                    onCheckedChange = { viewModel.setAutoStartOnLaunch(it) }
                 )
             }
 
-            // Drift Radius Input
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.drift_radius_meters), style = MaterialTheme.typography.titleMedium)
-                OutlinedTextField(
-                    value = driftRadiusInput,
-                    onValueChange = { 
-                        driftRadiusInput = it
-                        it.toDoubleOrNull()?.let { radius -> viewModel.setDriftRadius(radius) }
-                    },
+            HorizontalDivider()
+
+            // 2. Auto-stop Section
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    enabled = enableDrift
-                )
-                Text(
-                    stringResource(R.string.drift_radius_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            HorizontalDivider()
-
-            // Google Services Selection
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.use_google_services), style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        stringResource(R.string.use_google_services_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.auto_stop), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(R.string.auto_stop_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = enableAutoStop,
+                        onCheckedChange = { viewModel.setEnableAutoStop(it) }
                     )
                 }
-                Switch(
-                    checked = useGooglePlayServices,
-                    onCheckedChange = { viewModel.setUseGooglePlayServices(it) }
-                )
+
+                if (enableAutoStop) {
+                    OutlinedTextField(
+                        value = autoStopMinutesInput,
+                        onValueChange = {
+                            autoStopMinutesInput = it
+                            it.toIntOrNull()?.let { minutes -> viewModel.setAutoStopMinutes(minutes) }
+                        },
+                        label = { Text(stringResource(R.string.stop_after_minutes)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                }
             }
 
             HorizontalDivider()
 
-            // Real Altitude Selection
+            // 3. Random Drift Switch & Input
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.random_drift), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(R.string.random_drift_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = enableDrift,
+                        onCheckedChange = { viewModel.setEnableDrift(it) }
+                    )
+                }
+
+                if (enableDrift) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.drift_radius_meters), style = MaterialTheme.typography.titleSmall)
+                        OutlinedTextField(
+                            value = driftRadiusInput,
+                            onValueChange = { 
+                                driftRadiusInput = it
+                                it.toDoubleOrNull()?.let { radius -> viewModel.setDriftRadius(radius) }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                        )
+                        Text(
+                            stringResource(R.string.drift_radius_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            HorizontalDivider()
+
+            // 4. Real Altitude Selection
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -236,60 +275,23 @@ fun SettingsScreen(
 
             HorizontalDivider()
 
-            // Auto-stop Section
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.auto_stop), style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            stringResource(R.string.auto_stop_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(
-                        checked = enableAutoStop,
-                        onCheckedChange = { viewModel.setEnableAutoStop(it) }
-                    )
-                }
-
-                if (enableAutoStop) {
-                    OutlinedTextField(
-                        value = autoStopMinutesInput,
-                        onValueChange = {
-                            autoStopMinutesInput = it
-                            it.toIntOrNull()?.let { minutes -> viewModel.setAutoStopMinutes(minutes) }
-                        },
-                        label = { Text(stringResource(R.string.stop_after_minutes)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                    )
-                }
-            }
-
-            HorizontalDivider()
-
-            // Auto-start Section
+            // 5. Google Services Selection
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.auto_start_launch), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.use_google_services), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        stringResource(R.string.auto_start_launch_desc),
+                        stringResource(R.string.use_google_services_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Switch(
-                    checked = autoStartOnLaunch,
-                    onCheckedChange = { viewModel.setAutoStartOnLaunch(it) }
+                    checked = useGooglePlayServices,
+                    onCheckedChange = { viewModel.setUseGooglePlayServices(it) }
                 )
             }
         }
