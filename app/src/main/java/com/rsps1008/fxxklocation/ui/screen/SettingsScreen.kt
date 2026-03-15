@@ -40,6 +40,7 @@ fun SettingsScreen(
     val isIgnoringBatteryOptimizations by viewModel.isIgnoringBatteryOptimizations.collectAsState()
 
     var driftRadiusInput by remember { mutableStateOf("") }
+    var manualAltitudeInput by remember { mutableStateOf("") }
     
     // Sync string state with Double state if it changes from outside
     LaunchedEffect(driftRadius) {
@@ -48,6 +49,17 @@ fun SettingsScreen(
                 driftRadius.toInt().toString()
             } else {
                 driftRadius.toString()
+            }
+        }
+    }
+
+    // Sync manual altitude input
+    LaunchedEffect(lastAltitude) {
+        if (lastAltitude.toString() != manualAltitudeInput && lastAltitude != manualAltitudeInput.toDoubleOrNull()) {
+            manualAltitudeInput = if (lastAltitude % 1.0 == 0.0) {
+                lastAltitude.toInt().toString()
+            } else {
+                lastAltitude.toString()
             }
         }
     }
@@ -166,31 +178,46 @@ fun SettingsScreen(
             HorizontalDivider()
 
             // Real Altitude Selection
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.use_real_altitude), style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        stringResource(R.string.use_real_altitude_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (useRealAltitude) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.use_real_altitude), style = MaterialTheme.typography.titleMedium)
                         Text(
-                            stringResource(R.string.current_altitude, lastAltitude),
+                            stringResource(R.string.use_real_altitude_desc),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        if (useRealAltitude) {
+                            Text(
+                                stringResource(R.string.current_altitude, lastAltitude),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
+                    Switch(
+                        checked = useRealAltitude,
+                        onCheckedChange = { viewModel.setUseRealAltitude(it) }
+                    )
                 }
-                Switch(
-                    checked = useRealAltitude,
-                    onCheckedChange = { viewModel.setUseRealAltitude(it) }
-                )
+
+                if (!useRealAltitude) {
+                    OutlinedTextField(
+                        value = manualAltitudeInput,
+                        onValueChange = {
+                            manualAltitudeInput = it
+                            it.toDoubleOrNull()?.let { alt -> viewModel.setManualAltitude(alt) }
+                        },
+                        label = { Text(stringResource(R.string.manual_altitude)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                    )
+                }
             }
         }
     }

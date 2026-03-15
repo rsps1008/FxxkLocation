@@ -98,6 +98,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun setManualAltitude(altitude: Double) {
+        viewModelScope.launch {
+            settingsStore.setLastAltitudeValue(altitude)
+        }
+    }
+
     @SuppressLint("MissingPermission")
     private fun refreshAltitude() {
         if (!_hasPermission.value) return

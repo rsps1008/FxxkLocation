@@ -22,6 +22,7 @@
     <string name="use_google_services_desc">透過 Fused Location Provider 獲取目前位置（需 Google Play 服務）。</string>
     <string name="use_real_altitude">使用真實高度</string>
     <string name="use_real_altitude_desc">開啟模擬或切換此設定時，從目前位置獲取真實高度。</string>
+    <string name="manual_altitude">手動設定高度（公尺）</string>
     <string name="current_altitude">目前高度：%.2f 公尺</string>
     <string name="ok">正常</string>
     <string name="fix">修復</string>

@@ -70,14 +70,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val lastLat = settingsStore.lastLatitude.first()
             val lastLng = settingsStore.lastLongitude.first()
-            val lastAlt = settingsStore.lastAltitudeValue.first()
             if (lastLat != null && lastLng != null) {
-                selectedLocation = LocationData(lastLat, lastLng, lastAlt)
+                selectedLocation = selectedLocation.copy(latitude = lastLat, longitude = lastLng)
             }
 
             // If "use real altitude" is enabled, refresh it on start
             if (settingsStore.useRealAltitude.first()) {
                 refreshRealAltitude()
+            }
+        }
+
+        // Observe altitude updates from settings (manual or real)
+        viewModelScope.launch {
+            settingsStore.lastAltitudeValue.collect { alt ->
+                selectedLocation = selectedLocation.copy(altitude = alt)
             }
         }
     }
