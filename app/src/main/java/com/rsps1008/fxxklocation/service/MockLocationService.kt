@@ -3,6 +3,7 @@ package com.rsps1008.fxxklocation.service
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -19,6 +20,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.rsps1008.fxxklocation.R
+import com.rsps1008.fxxklocation.MainActivity
 
 class MockLocationService : Service() {
     private val scope = CoroutineScope(Dispatchers.Main + Job())
@@ -110,15 +112,33 @@ class MockLocationService : Service() {
     private fun stopMocking() {
         mockJob?.cancel()
         mockLocationManager.stopMock()
+        scope.launch {
+            settingsStore.setIsMocking(false)
+        }
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
     private fun createNotification(): Notification {
+        val stopIntent = Intent(this, MockLocationService::class.java).apply {
+            action = ACTION_STOP_MOCK
+        }
+        val stopPendingIntent = PendingIntent.getService(
+            this, 0, stopIntent, PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val mainIntent = Intent(this, MainActivity::class.java)
+        val mainPendingIntent = PendingIntent.getActivity(
+            this, 0, mainIntent, PendingIntent.FLAG_IMMUTABLE
+        )
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.notification_title))
             .setContentText(getString(R.string.notification_text))
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setContentIntent(mainPendingIntent)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, getString(R.string.stop), stopPendingIntent)
+            .setOngoing(true)
             .build()
     }
 

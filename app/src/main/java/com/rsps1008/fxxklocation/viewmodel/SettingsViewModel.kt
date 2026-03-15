@@ -47,6 +47,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _isMockAppSet = MutableStateFlow(false)
     val isMockAppSet = _isMockAppSet.asStateFlow()
 
+    private val _hasNotificationPermission = MutableStateFlow(false)
+    val hasNotificationPermission = _hasNotificationPermission.asStateFlow()
+
     private val _isIgnoringBatteryOptimizations = MutableStateFlow(false)
     val isIgnoringBatteryOptimizations = _isIgnoringBatteryOptimizations.asStateFlow()
 
@@ -58,6 +61,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         _hasPermission.value = SystemCheckUtil.hasLocationPermission(context)
         _isGpsEnabled.value = SystemCheckUtil.isGpsEnabled(context)
         _isMockAppSet.value = SystemCheckUtil.isMockLocationEnabled(context)
+        _hasNotificationPermission.value = SystemCheckUtil.hasNotificationPermission(context)
         _isIgnoringBatteryOptimizations.value = SystemCheckUtil.isIgnoringBatteryOptimizations(context)
         
         viewModelScope.launch {

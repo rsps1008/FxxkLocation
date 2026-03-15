@@ -43,6 +43,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isMockAppSet = MutableStateFlow(false)
     val isMockAppSet = _isMockAppSet.asStateFlow()
 
+    private val _hasNotificationPermission = MutableStateFlow(false)
+    val hasNotificationPermission = _hasNotificationPermission.asStateFlow()
+
     private val _isIgnoringBatteryOptimizations = MutableStateFlow(false)
     val isIgnoringBatteryOptimizations = _isIgnoringBatteryOptimizations.asStateFlow()
 
@@ -166,6 +169,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _hasPermission.value = SystemCheckUtil.hasLocationPermission(context)
         _isGpsEnabled.value = SystemCheckUtil.isGpsEnabled(context)
         _isMockAppSet.value = SystemCheckUtil.isMockLocationEnabled(context)
+        _hasNotificationPermission.value = SystemCheckUtil.hasNotificationPermission(context)
         _isIgnoringBatteryOptimizations.value = SystemCheckUtil.isIgnoringBatteryOptimizations(context)
     }
 
@@ -233,7 +237,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
 
     fun startMock() {
-        if (!_isMockAppSet.value || !_hasPermission.value || !_isIgnoringBatteryOptimizations.value) return
+        if (!_isMockAppSet.value || !_hasPermission.value || !_isIgnoringBatteryOptimizations.value || !_hasNotificationPermission.value) return
         
         val intent = Intent(context, MockLocationService::class.java).apply {
             action = MockLocationService.ACTION_START_MOCK

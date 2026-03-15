@@ -10,6 +10,7 @@
     <string name="stop">停止</string>
     <string name="system_permissions">系統權限</string>
     <string name="location_permission">位置權限</string>
+    <string name="notification_permission">通知權限</string>
     <string name="gps_enabled">GPS 已開啟</string>
     <string name="mock_app_selected">已選擇模擬應用程式</string>
     <string name="ignore_battery_optimization">忽略電池最佳化</string>

@@ -34,9 +34,23 @@ fun SettingsScreen(
     val useRealAltitude by viewModel.useRealAltitude.collectAsState()
     val lastAltitude by viewModel.lastAltitude.collectAsState()
     val hasPermission by viewModel.hasPermission.collectAsState()
+    val hasNotificationPermission by viewModel.hasNotificationPermission.collectAsState()
     val isGpsEnabled by viewModel.isGpsEnabled.collectAsState()
     val isMockAppSet by viewModel.isMockAppSet.collectAsState()
     val isIgnoringBatteryOptimizations by viewModel.isIgnoringBatteryOptimizations.collectAsState()
+
+    var driftRadiusInput by remember { mutableStateOf("") }
+    
+    // Sync string state with Double state if it changes from outside
+    LaunchedEffect(driftRadius) {
+        if (driftRadius.toString() != driftRadiusInput && driftRadius != driftRadiusInput.toDoubleOrNull()) {
+            driftRadiusInput = if (driftRadius % 1.0 == 0.0) {
+                driftRadius.toInt().toString()
+            } else {
+                driftRadius.toString()
+            }
+        }
+    }
 
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -77,6 +91,7 @@ fun SettingsScreen(
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(8.dp)) {
                         StatusItem(stringResource(R.string.location_permission), hasPermission) { SystemCheckUtil.openAppSettings(context) }
+                        StatusItem(stringResource(R.string.notification_permission), hasNotificationPermission) { SystemCheckUtil.openAppSettings(context) }
                         StatusItem(stringResource(R.string.gps_enabled), isGpsEnabled) { SystemCheckUtil.openLocationSettings(context) }
                         StatusItem(stringResource(R.string.mock_app_selected), isMockAppSet) { SystemCheckUtil.openDevelopmentSettings(context) }
                         StatusItem(stringResource(R.string.ignore_battery_optimization), isIgnoringBatteryOptimizations) { SystemCheckUtil.openBatteryOptimizationSettings(context) }
@@ -110,8 +125,9 @@ fun SettingsScreen(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.drift_radius_meters), style = MaterialTheme.typography.titleMedium)
                 OutlinedTextField(
-                    value = driftRadius.toString(),
+                    value = driftRadiusInput,
                     onValueChange = { 
+                        driftRadiusInput = it
                         it.toDoubleOrNull()?.let { radius -> viewModel.setDriftRadius(radius) }
                     },
                     modifier = Modifier.fillMaxWidth(),

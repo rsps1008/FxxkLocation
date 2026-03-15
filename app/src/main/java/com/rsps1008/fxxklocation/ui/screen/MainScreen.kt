@@ -40,6 +40,7 @@ fun MainScreen(
     val isMocking by viewModel.isMocking.collectAsState()
     val isApplied by viewModel.isApplied.collectAsState()
     val hasPermission by viewModel.hasPermission.collectAsState()
+    val hasNotificationPermission by viewModel.hasNotificationPermission.collectAsState()
     val isGpsEnabled by viewModel.isGpsEnabled.collectAsState()
     val isMockAppSet by viewModel.isMockAppSet.collectAsState()
     val isIgnoringBatteryOptimizations by viewModel.isIgnoringBatteryOptimizations.collectAsState()
@@ -190,7 +191,7 @@ fun MainScreen(
                 LargeFloatingActionButton(
                     onClick = { 
                         if (!isApplied) {
-                            if (hasPermission && isMockAppSet && isGpsEnabled && isIgnoringBatteryOptimizations) {
+                            if (hasPermission && isMockAppSet && isGpsEnabled && isIgnoringBatteryOptimizations && hasNotificationPermission) {
                                 viewModel.startMock()
                             } else {
                                 showPermissionDialog = true

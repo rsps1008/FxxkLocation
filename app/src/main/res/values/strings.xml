@@ -10,6 +10,7 @@
     <string name="stop">Stop</string>
     <string name="system_permissions">System Permissions</string>
     <string name="location_permission">Location Permission</string>
+    <string name="notification_permission">Notification Permission</string>
     <string name="gps_enabled">GPS Enabled</string>
     <string name="mock_app_selected">Mock App Selected</string>
     <string name="ignore_battery_optimization">Ignore Battery Optimization</string>
