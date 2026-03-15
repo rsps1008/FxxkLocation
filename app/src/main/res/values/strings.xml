@@ -35,5 +35,6 @@
     <string name="locate_me">Locate Me</string>
     <string name="notification_title">Mock Location Running</string>
     <string name="notification_text">Mocking location updates&#8230;</string>
+    <string name="notification_text_auto_stop">Mocking location (Auto-stop in %d mins)</string>
     <string name="notification_channel_name">Mock Location Service</string>
 </resources>

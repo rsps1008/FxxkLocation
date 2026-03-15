@@ -90,7 +90,10 @@ class MockLocationService : Service() {
                 if (autoStop) {
                     val minutes = settingsStore.autoStopMinutes.first()
                     if (minutes > 0) {
-                        delay(minutes * 60L * 1000L)
+                        for (i in minutes downTo 1) {
+                            updateNotification(i)
+                            delay(60L * 1000L)
+                        }
                         stopMocking()
                     }
                 }
@@ -129,7 +132,7 @@ class MockLocationService : Service() {
         stopSelf()
     }
 
-    private fun createNotification(): Notification {
+    private fun createNotification(remainingMinutes: Int? = null): Notification {
         val stopIntent = Intent(this, MockLocationService::class.java).apply {
             action = ACTION_STOP_MOCK
         }
@@ -142,21 +145,41 @@ class MockLocationService : Service() {
             this, 0, mainIntent, PendingIntent.FLAG_IMMUTABLE
         )
 
+        val contentText = if (remainingMinutes != null) {
+            getString(R.string.notification_text_auto_stop, remainingMinutes)
+        } else {
+            getString(R.string.notification_text)
+        }
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.notification_title))
-            .setContentText(getString(R.string.notification_text))
+            .setContentText(contentText)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setContentIntent(mainPendingIntent)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, getString(R.string.stop), stopPendingIntent)
             .setOngoing(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .setSilent(true)
+            .setOnlyAlertOnce(true)
             .build()
+    }
+
+    private fun updateNotification(remainingMinutes: Int? = null) {
+        val notification = createNotification(remainingMinutes)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
             getString(R.string.notification_channel_name),
-            NotificationManager.IMPORTANCE_LOW
+            NotificationManager.IMPORTANCE_DEFAULT
         )
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(channel)

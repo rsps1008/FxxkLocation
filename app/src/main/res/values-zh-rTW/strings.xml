@@ -35,5 +35,6 @@
     <string name="locate_me">定位到目前位置</string>
     <string name="notification_title">模擬位置執行中</string>
     <string name="notification_text">正在模擬位置更新…</string>
+    <string name="notification_text_auto_stop">正在模擬位置（%d 分鐘後自動停止）</string>
     <string name="notification_channel_name">模擬位置服務</string>
 </resources>
