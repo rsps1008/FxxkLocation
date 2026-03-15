@@ -53,6 +53,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         checkStatus()
         loadLastLocation()
         syncMockingStatus()
+        checkAutoStart()
+    }
+
+    private fun checkAutoStart() {
+        viewModelScope.launch {
+            val autoStart = settingsStore.autoStartOnLaunch.first()
+            if (autoStart) {
+                // Wait for checkStatus to complete and ensure all permissions/settings are OK
+                delay(1000) 
+                if (_isMockAppSet.value && _hasPermission.value && _isIgnoringBatteryOptimizations.value && _hasNotificationPermission.value) {
+                    startMock()
+                }
+            }
+        }
     }
 
     private fun syncMockingStatus() {

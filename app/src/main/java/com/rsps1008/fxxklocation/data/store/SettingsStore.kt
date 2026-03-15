@@ -25,6 +25,7 @@ class SettingsStore(private val context: Context) {
         val IS_MOCKING = booleanPreferencesKey("is_mocking")
         val ENABLE_AUTO_STOP = booleanPreferencesKey("enable_auto_stop")
         val AUTO_STOP_MINUTES = intPreferencesKey("auto_stop_minutes")
+        val AUTO_START_ON_LAUNCH = booleanPreferencesKey("auto_start_on_launch")
     }
 
     val enableDrift: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -65,6 +66,10 @@ class SettingsStore(private val context: Context) {
 
     val autoStopMinutes: Flow<Int> = context.dataStore.data.map { preferences ->
         preferences[AUTO_STOP_MINUTES] ?: 30
+    }
+
+    val autoStartOnLaunch: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[AUTO_START_ON_LAUNCH] ?: false
     }
 
     suspend fun setEnableDrift(enabled: Boolean) {
@@ -119,6 +124,12 @@ class SettingsStore(private val context: Context) {
     suspend fun setAutoStopMinutes(minutes: Int) {
         context.dataStore.edit { preferences ->
             preferences[AUTO_STOP_MINUTES] = minutes
+        }
+    }
+
+    suspend fun setAutoStartOnLaunch(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[AUTO_START_ON_LAUNCH] = enabled
         }
     }
 }

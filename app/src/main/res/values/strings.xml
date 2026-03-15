@@ -26,6 +26,8 @@
     <string name="auto_stop">Auto-stop Mocking</string>
     <string name="auto_stop_desc">Automatically stop mocking after a set time.</string>
     <string name="stop_after_minutes">Stop after (minutes)</string>
+    <string name="auto_start_launch">Auto-start on Launch</string>
+    <string name="auto_start_launch_desc">Automatically start mocking using the last saved location when the app opens.</string>
     <string name="current_altitude">Current Altitude: %.2f m</string>
     <string name="ok">OK</string>
     <string name="fix">Fix</string>

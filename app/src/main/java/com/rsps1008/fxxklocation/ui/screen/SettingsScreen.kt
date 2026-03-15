@@ -37,6 +37,7 @@ fun SettingsScreen(
     val lastAltitude by viewModel.lastAltitude.collectAsState()
     val enableAutoStop by viewModel.enableAutoStop.collectAsState()
     val autoStopMinutes by viewModel.autoStopMinutes.collectAsState()
+    val autoStartOnLaunch by viewModel.autoStartOnLaunch.collectAsState()
     val hasPermission by viewModel.hasPermission.collectAsState()
     val hasNotificationPermission by viewModel.hasNotificationPermission.collectAsState()
     val isGpsEnabled by viewModel.isGpsEnabled.collectAsState()
@@ -268,6 +269,28 @@ fun SettingsScreen(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                 }
+            }
+
+            HorizontalDivider()
+
+            // Auto-start Section
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.auto_start_launch), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(R.string.auto_start_launch_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = autoStartOnLaunch,
+                    onCheckedChange = { viewModel.setAutoStartOnLaunch(it) }
+                )
             }
         }
     }

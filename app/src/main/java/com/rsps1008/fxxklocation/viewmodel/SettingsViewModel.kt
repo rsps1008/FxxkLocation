@@ -44,6 +44,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val autoStopMinutes: StateFlow<Int> = settingsStore.autoStopMinutes
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 30)
 
+    val autoStartOnLaunch: StateFlow<Boolean> = settingsStore.autoStartOnLaunch
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     private val _hasPermission = MutableStateFlow(false)
     val hasPermission = _hasPermission.asStateFlow()
 
@@ -119,6 +122,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setAutoStopMinutes(minutes: Int) {
         viewModelScope.launch {
             settingsStore.setAutoStopMinutes(minutes)
+        }
+    }
+
+    fun setAutoStartOnLaunch(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsStore.setAutoStartOnLaunch(enabled)
         }
     }
 
