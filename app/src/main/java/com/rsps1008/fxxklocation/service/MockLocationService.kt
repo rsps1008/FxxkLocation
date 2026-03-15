@@ -154,7 +154,7 @@ class MockLocationService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.notification_title))
             .setContentText(contentText)
-            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(mainPendingIntent)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, getString(R.string.stop), stopPendingIntent)
             .setOngoing(true)
