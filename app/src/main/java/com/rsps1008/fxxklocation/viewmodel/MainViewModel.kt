@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import com.rsps1008.fxxklocation.data.model.LocationData
 import com.rsps1008.fxxklocation.data.store.SettingsStore
 import com.rsps1008.fxxklocation.service.MockLocationService
@@ -78,53 +79,79 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    @SuppressLint("MissingPermission")
     private fun refreshRealAltitude() {
         if (!_hasPermission.value) return
         
         viewModelScope.launch {
             val wasMocking = _isMocking.value
             if (wasMocking) {
+                // To get real location, we need to pause mock (remove test provider)
                 val pauseIntent = Intent(context, MockLocationService::class.java).apply {
                     action = MockLocationService.ACTION_PAUSE_MOCK
                 }
                 context.startService(pauseIntent)
-                delay(500) 
+                delay(1000) // Brief delay to let provider removal take effect
             }
 
             val useFLP = settingsStore.useGooglePlayServices.first()
             if (useFLP) {
                 val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
                 try {
-                    fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                        location?.let {
-                            updateAltitude(it.altitude)
+                    fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                        .addOnSuccessListener { location ->
+                            location?.let {
+                                updateAltitude(it.altitude)
+                            }
+                            if (wasMocking) resumeMockAfterRefresh()
+                        }.addOnFailureListener {
+                            if (wasMocking) resumeMockAfterRefresh()
                         }
-                        resumeMockIfNeeded(wasMocking)
-                    }.addOnFailureListener {
-                        resumeMockIfNeeded(wasMocking)
-                    }
                 } catch (e: SecurityException) {
-                    resumeMockIfNeeded(wasMocking)
+                    if (wasMocking) resumeMockAfterRefresh()
                 }
             } else {
                 val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
                 try {
-                    val providers = locationManager.getProviders(true)
-                    var bestAltitude = 3.0
-                    var found = false
-                    for (provider in providers) {
-                        val l = locationManager.getLastKnownLocation(provider) ?: continue
-                        bestAltitude = l.altitude
-                        found = true
-                        break
+                    locationManager.getCurrentLocation(
+                        android.location.LocationManager.GPS_PROVIDER,
+                        null,
+                        context.mainExecutor
+                    ) { location ->
+                        location?.let {
+                            updateAltitude(it.altitude)
+                        }
+                        if (wasMocking) resumeMockAfterRefresh()
                     }
-                    if (found) {
-                        updateAltitude(bestAltitude)
-                    }
-                } catch (e: SecurityException) {
+                } catch (e: Exception) {
+                    // Fallback to last known if getCurrentLocation fails
+                    try {
+                        val providers = locationManager.getProviders(true)
+                        for (provider in providers) {
+                            val l = locationManager.getLastKnownLocation(provider) ?: continue
+                            updateAltitude(l.altitude)
+                            break
+                        }
+                    } catch (e: SecurityException) {}
+                    if (wasMocking) resumeMockAfterRefresh()
                 }
-                resumeMockIfNeeded(wasMocking)
             }
+        }
+    }
+
+    private fun resumeMockAfterRefresh() {
+        viewModelScope.launch {
+            val lastLat = settingsStore.lastLatitude.first() ?: return@launch
+            val lastLng = settingsStore.lastLongitude.first() ?: return@launch
+            val lastAlt = settingsStore.lastAltitudeValue.first()
+            
+            val intent = Intent(context, MockLocationService::class.java).apply {
+                action = MockLocationService.ACTION_START_MOCK
+                putExtra(MockLocationService.EXTRA_LATITUDE, lastLat)
+                putExtra(MockLocationService.EXTRA_LONGITUDE, lastLng)
+                putExtra(MockLocationService.EXTRA_ALTITUDE, lastAlt)
+            }
+            context.startForegroundService(intent)
         }
     }
 
@@ -155,81 +182,55 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!_hasPermission.value) return
         
         viewModelScope.launch {
-            val wasMocking = _isMocking.value
+            // 1. Forcibly stop mock (equivalent to clicking X)
+            stopMock()
+            delay(1000) // Give it some time to clear mock provider
+            
             val useFLP = settingsStore.useGooglePlayServices.first()
             
-            // 1. Temporarily pause mock if active
-            if (wasMocking) {
-                val pauseIntent = Intent(context, MockLocationService::class.java).apply {
-                    action = MockLocationService.ACTION_PAUSE_MOCK
-                }
-                context.startService(pauseIntent)
-                delay(500) // Brief delay to let provider removal take effect
-            }
-            
             if (useFLP) {
-                // 2a. Get real location using FusedLocationProviderClient
+                // 2a. Get real location using FusedLocationProviderClient (forcing refresh)
                 val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
-                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                    processNewLocation(location, wasMocking)
-                }.addOnFailureListener {
-                    resumeMockIfNeeded(wasMocking)
-                }
+                fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                    .addOnSuccessListener { location ->
+                        location?.let {
+                            updateSelectedLocation(it.latitude, it.longitude)
+                            updateAltitude(it.altitude)
+                        }
+                    }
             } else {
                 // 2b. Get real location using traditional LocationManager
                 val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
-                val providers = locationManager.getProviders(true)
-                var bestLocation: android.location.Location? = null
-                
-                for (provider in providers) {
-                    val l = locationManager.getLastKnownLocation(provider) ?: continue
-                    if (bestLocation == null || l.accuracy < bestLocation.accuracy) {
-                        bestLocation = l
+                try {
+                    locationManager.getCurrentLocation(
+                        android.location.LocationManager.GPS_PROVIDER,
+                        null,
+                        context.mainExecutor
+                    ) { location ->
+                        location?.let {
+                            updateSelectedLocation(it.latitude, it.longitude)
+                            updateAltitude(it.altitude)
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Fallback to last known if getCurrentLocation fails
+                    val providers = locationManager.getProviders(true)
+                    var bestLocation: android.location.Location? = null
+                    for (provider in providers) {
+                        val l = locationManager.getLastKnownLocation(provider) ?: continue
+                        if (bestLocation == null || l.accuracy < bestLocation.accuracy) {
+                            bestLocation = l
+                        }
+                    }
+                    bestLocation?.let {
+                        updateSelectedLocation(it.latitude, it.longitude)
+                        updateAltitude(it.altitude)
                     }
                 }
-                processNewLocation(bestLocation, wasMocking)
             }
         }
     }
 
-    private fun processNewLocation(location: android.location.Location?, wasMocking: Boolean) {
-        location?.let {
-            updateSelectedLocation(it.latitude, it.longitude)
-            val altitudeToUse = it.altitude
-            updateAltitude(altitudeToUse)
-            
-            // 3. Resume mock with NEW location if it was active
-            if (wasMocking) {
-                val resumeIntent = Intent(context, MockLocationService::class.java).apply {
-                    action = MockLocationService.ACTION_START_MOCK
-                    putExtra(MockLocationService.EXTRA_LATITUDE, it.latitude)
-                    putExtra(MockLocationService.EXTRA_LONGITUDE, it.longitude)
-                    putExtra(MockLocationService.EXTRA_ALTITUDE, altitudeToUse)
-                }
-                context.startService(resumeIntent)
-            }
-        } ?: run {
-            resumeMockIfNeeded(wasMocking)
-        }
-    }
-
-    private fun resumeMockIfNeeded(wasMocking: Boolean) {
-        if (wasMocking) {
-            viewModelScope.launch {
-                val lastLat = settingsStore.lastLatitude.first() ?: return@launch
-                val lastLng = settingsStore.lastLongitude.first() ?: return@launch
-                val lastAlt = settingsStore.lastAltitudeValue.first()
-                
-                val intent = Intent(context, MockLocationService::class.java).apply {
-                    action = MockLocationService.ACTION_START_MOCK
-                    putExtra(MockLocationService.EXTRA_LATITUDE, lastLat)
-                    putExtra(MockLocationService.EXTRA_LONGITUDE, lastLng)
-                    putExtra(MockLocationService.EXTRA_ALTITUDE, lastAlt)
-                }
-                context.startForegroundService(intent)
-            }
-        }
-    }
 
     fun startMock() {
         if (!_isMockAppSet.value || !_hasPermission.value || !_isIgnoringBatteryOptimizations.value) return

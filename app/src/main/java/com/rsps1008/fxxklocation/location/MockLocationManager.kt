@@ -15,44 +15,89 @@ import kotlin.math.sqrt
 class MockLocationManager(private val context: Context) {
     private val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     private val fusedLocationClient: FusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(context)
-    private val providerName = LocationManager.GPS_PROVIDER
+    private val providers = listOf(
+        LocationManager.GPS_PROVIDER,
+        LocationManager.NETWORK_PROVIDER,
+        LocationManager.PASSIVE_PROVIDER,
+        "fused" // 許多 WebView 會直接使用融合定位來源
+    )
 
     @SuppressLint("MissingPermission")
     fun startMock() {
-        try {
-            locationManager.addTestProvider(
-                providerName,
-                false, false, false, false, true, true, true,
-                1, // Power usage low
-                1  // Accuracy fine
-            )
-            locationManager.setTestProviderEnabled(providerName, true)
-        } catch (e: Exception) {
-            // Already added or permission denied
+        providers.forEach { provider ->
+            try {
+                // 確保先移除舊的，重新建立乾淨的 Test Provider
+                try {
+                    locationManager.removeTestProvider(provider)
+                } catch (e: Exception) {}
+
+                val requiresNetwork = provider == LocationManager.NETWORK_PROVIDER || provider == "fused"
+                val requiresSatellite = provider == LocationManager.GPS_PROVIDER || provider == "fused"
+                val requiresCell = provider == LocationManager.NETWORK_PROVIDER
+
+                locationManager.addTestProvider(
+                    provider,
+                    requiresNetwork,
+                    requiresSatellite,
+                    requiresCell,
+                    false, // hasMonetaryCost
+                    true,  // supportsAltitude
+                    true,  // supportsSpeed
+                    true,  // supportsBearing
+                    1,     // powerRequirement (POWER_LOW)
+                    1      // accuracy (ACCURACY_FINE)
+                )
+                locationManager.setTestProviderEnabled(provider, true)
+            } catch (e: Exception) {
+                // 某些設備可能不支持 mock "fused"，忽略即可
+            }
         }
     }
 
     fun stopMock() {
-        try {
-            locationManager.removeTestProvider(providerName)
-        } catch (e: Exception) {
-            // Provider not found
+        providers.forEach { provider ->
+            try {
+                locationManager.removeTestProvider(provider)
+            } catch (e: Exception) {
+                // Provider not found
+            }
         }
     }
 
     fun updateMockLocation(locationData: LocationData) {
-        val mockLocation = Location(providerName).apply {
-            latitude = locationData.latitude
-            longitude = locationData.longitude
-            altitude = locationData.altitude
-            time = System.currentTimeMillis()
-            accuracy = 1.0f
-            elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
-        }
-        try {
-            locationManager.setTestProviderLocation(providerName, mockLocation)
-        } catch (e: Exception) {
-            // Handle error
+        val currentTime = System.currentTimeMillis()
+        val elapsedNanos = SystemClock.elapsedRealtimeNanos()
+
+        providers.forEach { provider ->
+            val mockLocation = Location(provider).apply {
+                latitude = locationData.latitude
+                longitude = locationData.longitude
+                altitude = locationData.altitude
+                time = currentTime
+                elapsedRealtimeNanos = elapsedNanos
+                
+                // 設定極高的精度，讓 WebView 引擎強制採信這筆數據
+                accuracy = 1.0f 
+                try {
+                    setVerticalAccuracyMeters(1.0f)
+                } catch (e: NoSuchMethodError) {}
+                
+                // 即使靜止也給予微小的速度，模擬真實傳感器活耀狀態
+                speed = 0.0f
+                bearing = 0.0f
+                
+                isMock = true
+                
+                // 額外標記，部分 WebView 內核會檢查 bundle
+                val bundle = android.os.Bundle()
+                bundle.putBoolean("mockLocation", true)
+                extras = bundle
+            }
+            try {
+                locationManager.setTestProviderLocation(provider, mockLocation)
+            } catch (e: Exception) {
+                // Handle error
+            }
         }
     }
 
