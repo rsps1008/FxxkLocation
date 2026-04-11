@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
+import com.rsps1008.fxxklocation.data.model.LocationData
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -22,6 +23,9 @@ class SettingsStore(private val context: Context) {
         val LAST_LATITUDE = doublePreferencesKey("last_latitude")
         val LAST_LONGITUDE = doublePreferencesKey("last_longitude")
         val LAST_ALTITUDE_VALUE = doublePreferencesKey("last_altitude_value")
+        val CURRENT_LATITUDE = doublePreferencesKey("current_latitude")
+        val CURRENT_LONGITUDE = doublePreferencesKey("current_longitude")
+        val CURRENT_ALTITUDE = doublePreferencesKey("current_altitude")
         val IS_MOCKING = booleanPreferencesKey("is_mocking")
         val ENABLE_AUTO_STOP = booleanPreferencesKey("enable_auto_stop")
         val AUTO_STOP_MINUTES = intPreferencesKey("auto_stop_minutes")
@@ -54,6 +58,16 @@ class SettingsStore(private val context: Context) {
 
     val lastAltitudeValue: Flow<Double> = context.dataStore.data.map { preferences ->
         preferences[LAST_ALTITUDE_VALUE] ?: 3.0
+    }
+
+    val currentLocation: Flow<LocationData?> = context.dataStore.data.map { preferences ->
+        val lat = preferences[CURRENT_LATITUDE]
+        val lng = preferences[CURRENT_LONGITUDE]
+        if (lat != null && lng != null) {
+            LocationData(lat, lng, preferences[CURRENT_ALTITUDE] ?: 0.0)
+        } else {
+            null
+        }
     }
 
     val isMocking: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -106,6 +120,14 @@ class SettingsStore(private val context: Context) {
     suspend fun setLastAltitudeValue(altitude: Double) {
         context.dataStore.edit { preferences ->
             preferences[LAST_ALTITUDE_VALUE] = altitude
+        }
+    }
+
+    suspend fun setCurrentLocation(location: LocationData) {
+        context.dataStore.edit { preferences ->
+            preferences[CURRENT_LATITUDE] = location.latitude
+            preferences[CURRENT_LONGITUDE] = location.longitude
+            preferences[CURRENT_ALTITUDE] = location.altitude
         }
     }
 

@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.rsps1008.fxxklocation.R
+import com.rsps1008.fxxklocation.util.LanguageHelper
 import com.rsps1008.fxxklocation.util.SystemCheckUtil
 import com.rsps1008.fxxklocation.viewmodel.SettingsViewModel
 
@@ -43,6 +44,9 @@ fun SettingsScreen(
     val isGpsEnabled by viewModel.isGpsEnabled.collectAsState()
     val isMockAppSet by viewModel.isMockAppSet.collectAsState()
     val isIgnoringBatteryOptimizations by viewModel.isIgnoringBatteryOptimizations.collectAsState()
+    var selectedLanguageTag by remember {
+        mutableStateOf(LanguageHelper.currentLanguageTag(context))
+    }
 
     var driftRadiusInput by remember { mutableStateOf("") }
     var manualAltitudeInput by remember { mutableStateOf("") }
@@ -127,7 +131,40 @@ fun SettingsScreen(
 
             HorizontalDivider()
 
-            // 1. Auto-start Section
+            // 1. Language Section
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    stringResource(R.string.language),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = !selectedLanguageTag.startsWith("zh"),
+                        onClick = {
+                            selectedLanguageTag = LanguageHelper.LANGUAGE_ENGLISH
+                            LanguageHelper.applyLanguage(LanguageHelper.LANGUAGE_ENGLISH)
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                    ) {
+                        Text(stringResource(R.string.english))
+                    }
+                    SegmentedButton(
+                        selected = selectedLanguageTag.startsWith("zh"),
+                        onClick = {
+                            selectedLanguageTag = LanguageHelper.LANGUAGE_CHINESE_TRADITIONAL
+                            LanguageHelper.applyLanguage(LanguageHelper.LANGUAGE_CHINESE_TRADITIONAL)
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                    ) {
+                        Text(stringResource(R.string.chinese))
+                    }
+                }
+            }
+
+            HorizontalDivider()
+
+            // 2. Auto-start Section
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -149,7 +186,7 @@ fun SettingsScreen(
 
             HorizontalDivider()
 
-            // 2. Auto-stop Section
+            // 3. Auto-stop Section
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -186,7 +223,7 @@ fun SettingsScreen(
 
             HorizontalDivider()
 
-            // 3. Random Drift Switch & Input
+            // 4. Random Drift Switch & Input
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -230,7 +267,7 @@ fun SettingsScreen(
 
             HorizontalDivider()
 
-            // 4. Real Altitude Selection
+            // 5. Real Altitude Selection
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -275,7 +312,7 @@ fun SettingsScreen(
 
             HorizontalDivider()
 
-            // 5. Google Services Selection
+            // 6. Google Services Selection
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,

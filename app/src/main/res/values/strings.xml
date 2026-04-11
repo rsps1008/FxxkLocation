@@ -37,4 +37,11 @@
     <string name="notification_text">Mocking location updates&#8230;</string>
     <string name="notification_text_auto_stop">Mocking location (Auto-stop in %d mins)</string>
     <string name="notification_channel_name">Mock Location Service</string>
+    <string name="language">Language</string>
+    <string name="english">English</string>
+    <string name="chinese">Chinese</string>
+    <string name="current_location">Current Location</string>
+    <string name="location_permission_required">Location permission is required.</string>
+    <string name="enable_gps_first">Please enable GPS first.</string>
+    <string name="unable_to_get_current_location">Unable to get current location on this device.</string>
 </resources>

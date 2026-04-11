@@ -4,6 +4,9 @@ import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.location.Location
+import android.location.LocationManager
+import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -11,12 +14,15 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.rsps1008.fxxklocation.R
 import com.rsps1008.fxxklocation.data.model.LocationData
 import com.rsps1008.fxxklocation.data.store.SettingsStore
 import com.rsps1008.fxxklocation.service.MockLocationService
 import com.rsps1008.fxxklocation.util.SystemCheckUtil
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -49,10 +55,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isIgnoringBatteryOptimizations = MutableStateFlow(false)
     val isIgnoringBatteryOptimizations = _isIgnoringBatteryOptimizations.asStateFlow()
 
+    private val _messages = MutableSharedFlow<Int>(extraBufferCapacity = 1)
+    val messages = _messages.asSharedFlow()
+
+    private val _cameraLocations = MutableSharedFlow<Location>(extraBufferCapacity = 1)
+    val cameraLocations = _cameraLocations.asSharedFlow()
+
+    private val _currentLocations = MutableSharedFlow<LocationData>(extraBufferCapacity = 1)
+    val currentLocations = _currentLocations.asSharedFlow()
+
+    private val _currentLocation = MutableStateFlow<LocationData?>(null)
+    val currentLocation = _currentLocation.asStateFlow()
+
     init {
         checkStatus()
         loadLastLocation()
         syncMockingStatus()
+        syncCurrentLocation()
+        refreshCurrentLocationSnapshot()
         checkAutoStart()
     }
 
@@ -71,11 +91,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun syncMockingStatus() {
         viewModelScope.launch {
+            var previousMocking = false
             settingsStore.isMocking.collect { mocking ->
                 _isMocking.value = mocking
                 if (!mocking) {
                     _isApplied.value = false
                 }
+                if (previousMocking && !mocking) {
+                    refreshRealLocationAfterMockStopped()
+                }
+                previousMocking = mocking
             }
         }
     }
@@ -99,6 +124,65 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             settingsStore.lastAltitudeValue.collect { alt ->
                 selectedLocation = selectedLocation.copy(altitude = alt)
             }
+        }
+    }
+
+    private fun syncCurrentLocation() {
+        viewModelScope.launch {
+            settingsStore.currentLocation.collect { location ->
+                location?.let {
+                    _currentLocation.value = it
+                    _currentLocations.tryEmit(it)
+                }
+            }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun refreshCurrentLocationSnapshot() {
+        if (!_hasPermission.value || !_isGpsEnabled.value) return
+
+        viewModelScope.launch {
+            val useFLP = settingsStore.useGooglePlayServices.first()
+            if (useFLP) {
+                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+                try {
+                    fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                        .addOnSuccessListener { location ->
+                            location?.let { updateCurrentLocation(it) }
+                        }.addOnFailureListener {
+                            applyBestLastKnownCurrentLocation()
+                        }
+                } catch (e: SecurityException) {
+                    applyBestLastKnownCurrentLocation()
+                }
+            } else {
+                applyBestLastKnownCurrentLocation()
+            }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun applyBestLastKnownCurrentLocation() {
+        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        try {
+            val providers = locationManager.getProviders(true)
+            var bestLocation: Location? = null
+
+            for (provider in providers) {
+                val location = try {
+                    locationManager.getLastKnownLocation(provider)
+                } catch (e: SecurityException) {
+                    null
+                } ?: continue
+
+                if (bestLocation == null || location.accuracy < bestLocation!!.accuracy) {
+                    bestLocation = location
+                }
+            }
+
+            bestLocation?.let { updateCurrentLocation(it) }
+        } catch (_: Exception) {
         }
     }
 
@@ -185,6 +269,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun updateCurrentLocation(location: Location) {
+        val currentLocation = LocationData(location.latitude, location.longitude, location.altitude)
+        _currentLocation.value = currentLocation
+        _currentLocations.tryEmit(currentLocation)
+        viewModelScope.launch {
+            settingsStore.setCurrentLocation(currentLocation)
+        }
+    }
+
     fun checkStatus() {
         _hasPermission.value = SystemCheckUtil.hasLocationPermission(context)
         _isGpsEnabled.value = SystemCheckUtil.isGpsEnabled(context)
@@ -202,57 +295,141 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     @SuppressLint("MissingPermission")
-    fun locateMe() {
-        if (!_hasPermission.value) return
+    fun centerMapOnCurrentLocation() {
+        if (!_hasPermission.value) {
+            _messages.tryEmit(R.string.location_permission_required)
+            return
+        }
+        if (!_isGpsEnabled.value) {
+            _messages.tryEmit(R.string.enable_gps_first)
+            return
+        }
         
         viewModelScope.launch {
-            // 1. Forcibly stop mock (equivalent to clicking X)
-            stopMock()
-            delay(1000) // Give it some time to clear mock provider
-            
             val useFLP = settingsStore.useGooglePlayServices.first()
-            
-            if (useFLP) {
-                // 2a. Get real location using FusedLocationProviderClient (forcing refresh)
-                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
-                fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
-                    .addOnSuccessListener { location ->
-                        location?.let {
-                            updateSelectedLocation(it.latitude, it.longitude)
-                            updateAltitude(it.altitude)
-                        }
-                    }
-            } else {
-                // 2b. Get real location using traditional LocationManager
-                val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
-                try {
-                    locationManager.getCurrentLocation(
-                        android.location.LocationManager.GPS_PROVIDER,
-                        null,
-                        context.mainExecutor
-                    ) { location ->
-                        location?.let {
-                            updateSelectedLocation(it.latitude, it.longitude)
-                            updateAltitude(it.altitude)
-                        }
-                    }
-                } catch (e: Exception) {
-                    // Fallback to last known if getCurrentLocation fails
-                    val providers = locationManager.getProviders(true)
-                    var bestLocation: android.location.Location? = null
-                    for (provider in providers) {
-                        val l = locationManager.getLastKnownLocation(provider) ?: continue
-                        if (bestLocation == null || l.accuracy < bestLocation.accuracy) {
-                            bestLocation = l
-                        }
-                    }
-                    bestLocation?.let {
-                        updateSelectedLocation(it.latitude, it.longitude)
-                        updateAltitude(it.altitude)
-                    }
-                }
+
+            // Recenter only from immediately available cached location to avoid
+            // late async updates snapping the camera back after the user pans away.
+            locateFromLastKnownLocation(
+                fusedLocationClient = if (useFLP) {
+                    LocationServices.getFusedLocationProviderClient(context)
+                } else {
+                    null
+                },
+                emitFailureMessage = false,
+                successMessageRes = null,
+                updateSelectedTarget = false,
+                updateAltitudeFromLocation = false,
+                resumeMockAfterLocate = false
+            )
+            if (!useFLP) {
+                applyBestLastKnownLocation(
+                    emitFailureMessage = true,
+                    successMessageRes = null,
+                    updateSelectedTarget = false,
+                    updateAltitudeFromLocation = false,
+                    resumeMockAfterLocate = false
+                )
             }
         }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun locateFromLastKnownLocation(
+        fusedLocationClient: com.google.android.gms.location.FusedLocationProviderClient? = null,
+        emitFailureMessage: Boolean = true,
+        @StringRes successMessageRes: Int? = null,
+        updateSelectedTarget: Boolean = false,
+        updateAltitudeFromLocation: Boolean = false,
+        resumeMockAfterLocate: Boolean = false
+    ) {
+        fusedLocationClient?.lastLocation
+            ?.addOnSuccessListener { location ->   
+                if (location != null) {
+                    applyLocatedPosition(location, successMessageRes, updateSelectedTarget, updateAltitudeFromLocation)
+                    if (resumeMockAfterLocate) resumeMockAfterRefresh()
+                } else {
+                    applyBestLastKnownLocation(
+                        emitFailureMessage,
+                        successMessageRes,
+                        updateSelectedTarget,
+                        updateAltitudeFromLocation,
+                        resumeMockAfterLocate
+                    )
+                }
+            }
+            ?.addOnFailureListener {
+                applyBestLastKnownLocation(
+                    emitFailureMessage,
+                    successMessageRes,
+                    updateSelectedTarget,
+                    updateAltitudeFromLocation,
+                    resumeMockAfterLocate
+                )
+            }
+            ?: applyBestLastKnownLocation(
+                emitFailureMessage,
+                successMessageRes,
+                updateSelectedTarget,
+                updateAltitudeFromLocation,
+                resumeMockAfterLocate
+            )
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun applyBestLastKnownLocation(
+        emitFailureMessage: Boolean = true,
+        @StringRes successMessageRes: Int? = null,
+        updateSelectedTarget: Boolean = false,
+        updateAltitudeFromLocation: Boolean = false,
+        resumeMockAfterLocate: Boolean = false
+    ) {
+        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val providers = locationManager.getProviders(true)
+        var bestLocation: Location? = null
+
+        for (provider in providers) {
+            val location = try {
+                locationManager.getLastKnownLocation(provider)
+            } catch (e: SecurityException) {
+                null
+            } ?: continue
+
+            if (bestLocation == null || location.accuracy < bestLocation!!.accuracy) {
+                bestLocation = location
+            }
+        }
+
+        if (bestLocation != null) {
+            applyLocatedPosition(bestLocation, successMessageRes, updateSelectedTarget, updateAltitudeFromLocation)
+            if (resumeMockAfterLocate) resumeMockAfterRefresh()
+        } else if (emitFailureMessage) {
+            _messages.tryEmit(R.string.unable_to_get_current_location)
+            if (resumeMockAfterLocate) resumeMockAfterRefresh()
+        }
+    }
+
+    private fun applyLocatedPosition(
+        location: Location,
+        @StringRes successMessageRes: Int? = null,
+        updateSelectedTarget: Boolean = false,
+        updateAltitudeFromLocation: Boolean = false
+    ) {
+        emitCameraLocation(location)
+        updateCurrentLocation(location)
+        if (updateSelectedTarget) {
+            updateSelectedLocation(location.latitude, location.longitude)
+        }
+        if (updateSelectedTarget || updateAltitudeFromLocation) {
+            updateAltitude(location.altitude)
+        }
+        if (successMessageRes != null) {
+            _messages.tryEmit(successMessageRes)
+        }
+    }
+
+    private fun emitCameraLocation(location: Location) {
+        _cameraLocations.tryEmit(location)
     }
 
 
@@ -281,5 +458,90 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             settingsStore.setIsMocking(false)
         }
         _isApplied.value = false
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun refreshRealLocationAfterMockStopped() {
+        if (!_hasPermission.value || !_isGpsEnabled.value) return
+
+        viewModelScope.launch {
+            val useFLP = settingsStore.useGooglePlayServices.first()
+            if (useFLP) {
+                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+                try {
+                    fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                        .addOnSuccessListener { location ->
+                            if (location != null) {
+                                updateCurrentLocation(location)
+                                applyLocatedPosition(
+                                    location = location,
+                                    successMessageRes = null,
+                                    updateSelectedTarget = false,
+                                    updateAltitudeFromLocation = true
+                                )
+                            } else {
+                                applyBestLastKnownLocation(
+                                    emitFailureMessage = false,
+                                    successMessageRes = null,
+                                    updateSelectedTarget = false,
+                                    updateAltitudeFromLocation = true,
+                                    resumeMockAfterLocate = false
+                                )
+                            }
+                        }.addOnFailureListener {
+                            applyBestLastKnownLocation(
+                                emitFailureMessage = false,
+                                successMessageRes = null,
+                                updateSelectedTarget = false,
+                                updateAltitudeFromLocation = true,
+                                resumeMockAfterLocate = false
+                            )
+                        }
+                } catch (e: SecurityException) {
+                    applyBestLastKnownLocation(
+                        emitFailureMessage = false,
+                        successMessageRes = null,
+                        updateSelectedTarget = false,
+                        updateAltitudeFromLocation = true,
+                        resumeMockAfterLocate = false
+                    )
+                }
+            } else {
+                val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+                try {
+                    locationManager.getCurrentLocation(
+                        LocationManager.GPS_PROVIDER,
+                        null,
+                        context.mainExecutor
+                    ) { location ->
+                        if (location != null) {
+                            updateCurrentLocation(location)
+                            applyLocatedPosition(
+                                location = location,
+                                successMessageRes = null,
+                                updateSelectedTarget = false,
+                                updateAltitudeFromLocation = true
+                            )
+                        } else {
+                            applyBestLastKnownLocation(
+                                emitFailureMessage = false,
+                                successMessageRes = null,
+                                updateSelectedTarget = false,
+                                updateAltitudeFromLocation = true,
+                                resumeMockAfterLocate = false
+                            )
+                        }
+                    }
+                } catch (e: Exception) {
+                    applyBestLastKnownLocation(
+                        emitFailureMessage = false,
+                        successMessageRes = null,
+                        updateSelectedTarget = false,
+                        updateAltitudeFromLocation = true,
+                        resumeMockAfterLocate = false
+                    )
+                }
+            }
+        }
     }
 }

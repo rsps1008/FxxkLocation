@@ -117,6 +117,7 @@ class MockLocationService : Service() {
                 }
                 
                 mockLocationManager.updateMockLocation(locationToMock)
+                settingsStore.setCurrentLocation(locationToMock)
                 delay(2000)
             }
         }

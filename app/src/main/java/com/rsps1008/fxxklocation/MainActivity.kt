@@ -1,9 +1,9 @@
 package com.rsps1008.fxxklocation
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -14,7 +14,7 @@ import com.rsps1008.fxxklocation.ui.theme.FxxkLocationTheme
 import com.rsps1008.fxxklocation.viewmodel.MainViewModel
 import com.rsps1008.fxxklocation.viewmodel.SettingsViewModel
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

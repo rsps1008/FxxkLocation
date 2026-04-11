@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Fxxk Location</string>
     <string name="permissions_required">需要权限</string>
@@ -12,29 +13,36 @@
     <string name="location_permission">位置权限</string>
     <string name="notification_permission">通知权限</string>
     <string name="gps_enabled">GPS 已开启</string>
-    <string name="mock_app_selected">已选择模拟应用程序</string>
+    <string name="mock_app_selected">已选择模拟应用</string>
     <string name="ignore_battery_optimization">忽略电池优化</string>
     <string name="random_drift">随机漂移</string>
-    <string name="random_drift_desc">每 2 秒微调位置与高度以模拟更真实的人類行为。</string>
+    <string name="random_drift_desc">每 2 秒微调位置与高度，以模拟更真实的人类行为。</string>
     <string name="drift_radius_meters">漂移半径（米）</string>
     <string name="drift_radius_desc">位置与中心点的最大漂移距离。</string>
     <string name="use_google_services">使用 Google 服务定位</string>
-    <string name="use_google_services_desc">通过 Fused Location Provider 获取当前位置（需 Google Play 服务）。</string>
+    <string name="use_google_services_desc">通过 Fused Location Provider 获取当前位置（需要 Google Play 服务）。</string>
     <string name="use_real_altitude">使用真实高度</string>
-    <string name="use_real_altitude_desc">开启模拟或切换此设置时，從目前位置获取真实高度。</string>
-    <string name="manual_altitude">手动设定高度（米）</string>
+    <string name="use_real_altitude_desc">开启模拟或切换此设置时，从当前位置获取真实高度。</string>
+    <string name="manual_altitude">手动设置高度（米）</string>
     <string name="auto_stop">自动停止模拟</string>
-    <string name="auto_stop_desc">在设定的时间后自动停止模拟位置。</string>
-    <string name="stop_after_minutes">几分钟后停止（分钟）</string>
+    <string name="auto_stop_desc">在设定时间后自动停止模拟位置。</string>
+    <string name="stop_after_minutes">多少分钟后停止（分钟）</string>
     <string name="auto_start_launch">启动时自动开始</string>
-    <string name="auto_start_launch_desc">开启 App 时，自动以最后一次保存的位置开始模拟。</string>
+    <string name="auto_start_launch_desc">打开 App 时，自动使用最后一次保存的位置开始模拟。</string>
     <string name="current_altitude">当前高度：%.2f 米</string>
     <string name="ok">正常</string>
     <string name="fix">修复</string>
     <string name="back">返回</string>
-    <string name="locate_me">定位到目前位置</string>
+    <string name="locate_me">定位到当前位置</string>
     <string name="notification_title">模拟位置运行中</string>
     <string name="notification_text">正在模拟位置更新…</string>
     <string name="notification_text_auto_stop">正在模拟位置（%d 分钟后自动停止）</string>
     <string name="notification_channel_name">模拟位置服务</string>
+    <string name="language">语言</string>
+    <string name="english">英文</string>
+    <string name="chinese">中文</string>
+    <string name="current_location">当前位置</string>
+    <string name="location_permission_required">需要位置权限。</string>
+    <string name="enable_gps_first">请先开启 GPS。</string>
+    <string name="unable_to_get_current_location">此设备无法取得当前位置。</string>
 </resources>

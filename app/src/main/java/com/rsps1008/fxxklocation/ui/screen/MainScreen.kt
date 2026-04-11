@@ -2,7 +2,6 @@ package com.rsps1008.fxxklocation.ui.screen
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -18,17 +17,26 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color as AndroidColor
+import android.graphics.Paint
+import android.widget.Toast
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.rsps1008.fxxklocation.R
 import com.rsps1008.fxxklocation.viewmodel.MainViewModel
-import org.osmdroid.config.Configuration
-import org.osmdroid.events.MapEventsReceiver
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.MapEventsOverlay
-import org.osmdroid.views.overlay.Marker
+import org.maplibre.android.annotations.IconFactory
+import org.maplibre.android.MapLibre
+import org.maplibre.android.annotations.Marker
+import org.maplibre.android.annotations.MarkerOptions
+import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,35 +52,61 @@ fun MainScreen(
     val isGpsEnabled by viewModel.isGpsEnabled.collectAsState()
     val isMockAppSet by viewModel.isMockAppSet.collectAsState()
     val isIgnoringBatteryOptimizations by viewModel.isIgnoringBatteryOptimizations.collectAsState()
+    val currentLocation by viewModel.currentLocation.collectAsState()
     
     val lifecycleOwner = LocalLifecycleOwner.current
     var showPermissionDialog by remember { mutableStateOf(false) }
     val mapViewRef = remember { mutableStateOf<MapView?>(null) }
+    val mapLibreMapRef = remember { mutableStateOf<MapLibreMap?>(null) }
+    val markerRef = remember { mutableStateOf<Marker?>(null) }
+    val currentMarkerRef = remember { mutableStateOf<Marker?>(null) }
+    val currentLocationIcon = remember(context) { createCurrentLocationIcon(context) }
 
     val selectedLoc = viewModel.selectedLocation
+
+    LaunchedEffect(viewModel) {
+        viewModel.messages.collect { messageRes ->
+            Toast.makeText(context, context.getString(messageRes), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.cameraLocations.collect { location ->
+            val point = LatLng(location.latitude, location.longitude)
+            mapLibreMapRef.value?.animateCamera(
+                CameraUpdateFactory.newCameraPosition(
+                    CameraPosition.Builder()
+                        .target(point)
+                        .zoom(16.5)
+                        .build()
+                )
+            )
+        }
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
+                Lifecycle.Event.ON_START -> mapViewRef.value?.onStart()
                 Lifecycle.Event.ON_RESUME -> {
                     viewModel.checkStatus()
                     mapViewRef.value?.onResume()
                 }
-                Lifecycle.Event.ON_PAUSE -> {
-                    mapViewRef.value?.onPause()
-                }
+                Lifecycle.Event.ON_PAUSE -> mapViewRef.value?.onPause()
+                Lifecycle.Event.ON_STOP -> mapViewRef.value?.onStop()
+                Lifecycle.Event.ON_DESTROY -> mapViewRef.value?.onDestroy()
                 else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            mapViewRef.value?.onDetach()
+            markerRef.value = null
+            currentMarkerRef.value = null
+            mapLibreMapRef.value = null
+            mapViewRef.value?.onDestroy()
+            mapViewRef.value = null
         }
-    }
-
-    LaunchedEffect(Unit) {
-        Configuration.getInstance().userAgentValue = context.packageName
     }
 
     if (showPermissionDialog) {
@@ -115,7 +149,7 @@ fun MainScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Map Section (OpenStreetMap)
+            // Map Section (MapLibre)
             ElevatedCard(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -126,52 +160,69 @@ fun MainScreen(
                 Box(modifier = Modifier.fillMaxSize()) {
                     AndroidView(
                         factory = { ctx ->
+                            MapLibre.getInstance(ctx)
                             MapView(ctx).apply {
-                                setTileSource(TileSourceFactory.MAPNIK)
-                                setMultiTouchControls(true)
-                                setTilesScaledToDpi(true)
-                                setBackgroundColor(android.graphics.Color.WHITE)
-                                controller.setZoom(15.0)
-                                controller.setCenter(GeoPoint(selectedLoc.latitude, selectedLoc.longitude))
-                                
-                                val marker = Marker(this)
-                                marker.position = GeoPoint(selectedLoc.latitude, selectedLoc.longitude)
-                                marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                                marker.title = context.getString(R.string.target_location)
-                                overlays.add(marker)
-
-                                val eventsOverlay = MapEventsOverlay(object : MapEventsReceiver {
-                                    override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
-                                        viewModel.updateSelectedLocation(p.latitude, p.longitude)
-                                        marker.position = p
-                                        invalidate()
-                                        return true
-                                    }
-                                    override fun longPressHelper(p: GeoPoint): Boolean = false
-                                })
-                                overlays.add(eventsOverlay)
                                 mapViewRef.value = this
+                                onCreate(null)
+                                onStart()
+                                onResume()
+                                getMapAsync { map ->
+                                    mapLibreMapRef.value = map
+                                    map.uiSettings.isCompassEnabled = true
+                                    map.uiSettings.isRotateGesturesEnabled = false
+                                    map.setStyle(Style.Builder().fromJson(MAPLIBRE_RASTER_STYLE_JSON)) {
+                                        val point = LatLng(selectedLoc.latitude, selectedLoc.longitude)
+                                        map.cameraPosition = CameraPosition.Builder()
+                                            .target(point)
+                                            .zoom(15.0)
+                                            .build()
+                                        markerRef.value = map.addMarker(
+                                            MarkerOptions()
+                                                .position(point)
+                                                .title(context.getString(R.string.target_location))
+                                        )
+                                        currentLocation?.let { location ->
+                                            val currentPoint = LatLng(location.latitude, location.longitude)
+                                            currentMarkerRef.value = map.addMarker(
+                                                MarkerOptions()
+                                                    .position(currentPoint)
+                                                    .title(context.getString(R.string.current_location))
+                                                    .icon(currentLocationIcon)
+                                            )
+                                        }
+                                    }
+                                    map.addOnMapClickListener { point ->
+                                        viewModel.updateSelectedLocation(point.latitude, point.longitude)
+                                        markerRef.value?.position = point
+                                        true
+                                    }
+                                }
                             }
                         },
-                        update = { mapView ->
-                            val point = GeoPoint(selectedLoc.latitude, selectedLoc.longitude)
-                            val marker = mapView.overlays.filterIsInstance<Marker>().firstOrNull()
-                            marker?.position = point
-                            // Check if current center is far from target, if so, center it.
-                            // We use a small threshold to avoid constant snapping while dragging.
-                            val currentCenter = mapView.mapCenter
-                            if (Math.abs(currentCenter.latitude - point.latitude) > 0.00001 || 
-                                Math.abs(currentCenter.longitude - point.longitude) > 0.00001) {
-                                mapView.controller.animateTo(point)
+                        update = {
+                            val point = LatLng(selectedLoc.latitude, selectedLoc.longitude)
+                            markerRef.value?.position = point
+
+                            currentLocation?.let { location ->
+                                val currentPoint = LatLng(location.latitude, location.longitude)
+                                val currentMarker = currentMarkerRef.value
+                                if (currentMarker == null) {
+                                    currentMarkerRef.value = mapLibreMapRef.value?.addMarker(
+                                        MarkerOptions()
+                                            .position(currentPoint)
+                                            .title(context.getString(R.string.current_location))
+                                            .icon(currentLocationIcon)
+                                    )
+                                } else {
+                                    currentMarker.position = currentPoint
+                                }
                             }
-                            mapView.invalidate()
                         },
                         modifier = Modifier.fillMaxSize()
                     )
 
-                    // Locate Me Button
                     SmallFloatingActionButton(
-                        onClick = { viewModel.locateMe() },
+                        onClick = { viewModel.centerMapOnCurrentLocation() },
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(16.dp),
@@ -205,11 +256,74 @@ fun MainScreen(
 
                 LargeFloatingActionButton(
                     onClick = { if (isMocking) viewModel.stopMock() },
-                    containerColor = if (isMocking) MaterialTheme.colorScheme.errorContainer else Color.LightGray
+                    containerColor = if (isMocking) {
+                        MaterialTheme.colorScheme.errorContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    },
+                    contentColor = if (isMocking) {
+                        MaterialTheme.colorScheme.onErrorContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
                 ) {
                     Icon(Icons.Default.Close, stringResource(R.string.stop), modifier = Modifier.size(36.dp))
                 }
             }
         }
     }
+}
+
+private const val MAPLIBRE_RASTER_STYLE_JSON = """
+{
+  "version": 8,
+  "name": "OSM Raster",
+  "sources": {
+    "osm": {
+      "type": "raster",
+      "tiles": [
+        "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+      ],
+      "tileSize": 256,
+      "minzoom": 0,
+      "maxzoom": 19,
+      "attribution": "© OpenStreetMap contributors"
+    }
+  },
+  "layers": [
+    {
+      "id": "osm-raster",
+      "type": "raster",
+      "source": "osm"
+    }
+  ]
+}
+"""
+
+private fun createCurrentLocationIcon(context: android.content.Context): org.maplibre.android.annotations.Icon {
+    val density = context.resources.displayMetrics.density
+    val size = (24 * density).roundToInt().coerceAtLeast(1)
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val center = size / 2f
+
+    val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.argb(80, 66, 133, 244)
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(center, center, size * 0.40f, haloPaint)
+
+    val outerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.WHITE
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(center, center, size * 0.28f, outerPaint)
+
+    val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.parseColor("#4285F4")
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(center, center, size * 0.18f, innerPaint)
+
+    return IconFactory.getInstance(context).fromBitmap(bitmap)
 }
