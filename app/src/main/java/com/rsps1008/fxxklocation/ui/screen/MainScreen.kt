@@ -56,6 +56,7 @@ fun MainScreen(
     
     val lifecycleOwner = LocalLifecycleOwner.current
     var showPermissionDialog by remember { mutableStateOf(false) }
+    var hasInitializedInitialCamera by remember { mutableStateOf(false) }
     val mapViewRef = remember { mutableStateOf<MapView?>(null) }
     val mapLibreMapRef = remember { mutableStateOf<MapLibreMap?>(null) }
     val markerRef = remember { mutableStateOf<Marker?>(null) }
@@ -82,6 +83,25 @@ fun MainScreen(
                 )
             )
         }
+    }
+
+    LaunchedEffect(mapLibreMapRef.value, currentLocation, selectedLoc.latitude, selectedLoc.longitude) {
+        if (hasInitializedInitialCamera) return@LaunchedEffect
+
+        val map = mapLibreMapRef.value ?: return@LaunchedEffect
+        val initialTarget = currentLocation?.let {
+            LatLng(it.latitude, it.longitude)
+        } ?: LatLng(selectedLoc.latitude, selectedLoc.longitude)
+
+        map.animateCamera(
+            CameraUpdateFactory.newCameraPosition(
+                CameraPosition.Builder()
+                    .target(initialTarget)
+                    .zoom(15.0)
+                    .build()
+            )
+        )
+        hasInitializedInitialCamera = true
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -171,7 +191,9 @@ fun MainScreen(
                                     map.uiSettings.isCompassEnabled = true
                                     map.uiSettings.isRotateGesturesEnabled = false
                                     map.setStyle(Style.Builder().fromJson(MAPLIBRE_RASTER_STYLE_JSON)) {
-                                        val point = LatLng(selectedLoc.latitude, selectedLoc.longitude)
+                                        val point = currentLocation?.let {
+                                            LatLng(it.latitude, it.longitude)
+                                        } ?: LatLng(selectedLoc.latitude, selectedLoc.longitude)
                                         map.cameraPosition = CameraPosition.Builder()
                                             .target(point)
                                             .zoom(15.0)

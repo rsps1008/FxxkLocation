@@ -74,7 +74,7 @@
 - 在主畫面以地圖選擇目標位置。
 - 可點擊「Locate Me」取得目前真實位置並同步更新海拔。
 - 啟動前景服務持續送出 mock location。
-- 可設定隨機漂移，每 2 秒更新一次位置與微幅海拔變化。
+- 可設定隨機漫步漂移，每 2 秒沿著上一個位置附近小步移動，並維持在設定的漂移半徑內，同時更新微幅海拔變化。
 - 可選擇手動海拔或抓取真實海拔。
 - 可選擇是否使用 Google Play Services 取得真實位置。
 - 可設定自動停止時間。
@@ -85,6 +85,7 @@
 - 當主畫面尚未啟動虛擬定位時，下方的 `X` 停止按鈕會維持灰階外觀，且點擊不會有反應；只有 mock 正在執行時才會真的停止。
 - 主畫面現在另外會顯示一個藍色的 current location 標記，用來表示系統目前回報的位置；紅色標記則維持代表使用者選定的虛擬目標點。
 - 主畫面地圖不會再因為 `selectedLocation` 或 current location 更新而自動把鏡頭拉回去；鏡頭只會在使用者按 `Locate Me` 時主動 recenter。
+- 進入主畫面時，地圖會優先以最後一次記錄的 current location 作為初始鏡頭位置，沒有 current location 時才退回到 `selectedLocation`。
 - 設定頁提供快速跳轉到系統權限／開發者選項／電池最佳化頁面。
 
 ## 專案結構
@@ -107,6 +108,7 @@
   - 下方停止按鈕在 mock 尚未啟動時會是灰階外觀且不會有反應；只有 mock 正在執行時才可停止。
   - 地圖上另外會顯示一個藍色 current location 標記，和紅色目標點分開顯示。
   - 地圖鏡頭不會因狀態更新自動回正，只有定位按鈕會主動 recenter。
+  - 進畫面時會先以最後記錄的 current location 當作初始鏡頭位置；若沒有 current location，才退回 `selectedLocation`。
 
 - `app/src/main/java/com/rsps1008/fxxklocation/ui/screen/SettingsScreen.kt`
   - 管理語言、漂移、海拔、Google 服務、自動停止、自動啟動等設定。
@@ -157,7 +159,7 @@
 - `app/src/main/java/com/rsps1008/fxxklocation/location/MockLocationManager.kt`
   - 建立與移除 test providers。
   - 對多個 provider 寫入 mock location。
-  - 可產生漂移後的位置。
+  - 可產生隨機漫步式漂移位置，並限制在指定半徑內。
 
 - `app/src/main/java/com/rsps1008/fxxklocation/util/SystemCheckUtil.kt`
   - 檢查定位／通知權限、GPS、mock app、電池最佳化狀態。

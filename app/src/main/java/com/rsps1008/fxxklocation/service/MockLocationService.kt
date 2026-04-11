@@ -79,7 +79,8 @@ class MockLocationService : Service() {
     }
 
     private fun startMocking(initialCenter: LocationData) {
-        var currentCenter = initialCenter
+        var center = initialCenter
+        var currentPosition = initialCenter
         mockJob?.cancel()
         mockLocationManager.startMock()
 
@@ -102,7 +103,8 @@ class MockLocationService : Service() {
             // Dynamically update altitude if it's changed in Settings or via real-refresh while mocking
             launch {
                 settingsStore.lastAltitudeValue.collect { alt ->
-                    currentCenter = currentCenter.copy(altitude = alt)
+                    center = center.copy(altitude = alt)
+                    currentPosition = currentPosition.copy(altitude = alt)
                 }
             }
 
@@ -111,10 +113,12 @@ class MockLocationService : Service() {
                 val radius = settingsStore.driftRadius.first()
                 
                 val locationToMock = if (enableDrift) {
-                    mockLocationManager.generateDriftLocation(currentCenter, radius)
+                    mockLocationManager.generateRandomWalkLocation(center, currentPosition, radius)
                 } else {
-                    currentCenter
+                    center
                 }
+
+                currentPosition = locationToMock
                 
                 mockLocationManager.updateMockLocation(locationToMock)
                 settingsStore.setCurrentLocation(locationToMock)

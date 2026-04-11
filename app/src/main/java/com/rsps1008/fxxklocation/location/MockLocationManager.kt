@@ -8,6 +8,7 @@ import android.os.SystemClock
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.rsps1008.fxxklocation.data.model.LocationData
+import kotlin.math.hypot
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -101,21 +102,38 @@ class MockLocationManager(private val context: Context) {
         }
     }
 
-    fun generateDriftLocation(center: LocationData, radiusInMeters: Double): LocationData {
-        val radiusInDegrees = radiusInMeters / 111320.0
-        val u = Math.random()
-        val v = Math.random()
-        val w = radiusInDegrees * sqrt(u)
-        val t = 2 * Math.PI * v
-        val x = w * cos(t)
-        val y = w * sin(t)
+    fun generateRandomWalkLocation(
+        anchor: LocationData,
+        previous: LocationData,
+        radiusInMeters: Double
+    ): LocationData {
+        val maxStepMeters = (radiusInMeters * 0.18).coerceAtLeast(2.0)
+        val stepMeters = maxStepMeters * (0.35 + Math.random() * 0.65)
+        val angle = 2 * Math.PI * Math.random()
 
-        val newLongitude = x / cos(Math.toRadians(center.latitude))
-        
+        val metersPerLatDegree = 111320.0
+        val metersPerLngDegree = (111320.0 * cos(Math.toRadians(anchor.latitude))).coerceAtLeast(1.0)
+
+        val dxFromAnchor = (previous.longitude - anchor.longitude) * metersPerLngDegree
+        val dyFromAnchor = (previous.latitude - anchor.latitude) * metersPerLatDegree
+
+        var candidateDx = dxFromAnchor + (stepMeters * cos(angle))
+        var candidateDy = dyFromAnchor + (stepMeters * sin(angle))
+        val distanceFromAnchor = hypot(candidateDx, candidateDy)
+
+        if (distanceFromAnchor > radiusInMeters) {
+            val inwardScale = (radiusInMeters * 0.98) / distanceFromAnchor
+            candidateDx *= inwardScale
+            candidateDy *= inwardScale
+        }
+
+        val nextLatitude = anchor.latitude + (candidateDy / metersPerLatDegree)
+        val nextLongitude = anchor.longitude + (candidateDx / metersPerLngDegree)
+
         // Add a small random altitude drift (±0.2 meters)
-        val altDrift = (Math.random() - 0.5) * 0.4 
-        val newAltitude = center.altitude + altDrift
+        val altDrift = (Math.random() - 0.5) * 0.4
+        val nextAltitude = previous.altitude + altDrift
 
-        return LocationData(center.latitude + y, center.longitude + newLongitude, newAltitude)
+        return LocationData(nextLatitude, nextLongitude, nextAltitude)
     }
 }
