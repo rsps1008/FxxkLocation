@@ -143,6 +143,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!_hasPermission.value || !_isGpsEnabled.value) return
 
         viewModelScope.launch {
+            if (settingsStore.isMocking.first()) return@launch
+
             val useFLP = settingsStore.useGooglePlayServices.first()
             if (useFLP) {
                 val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
@@ -304,8 +306,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _messages.tryEmit(R.string.enable_gps_first)
             return
         }
-        
+
         viewModelScope.launch {
+            val isMocking = settingsStore.isMocking.first()
+            if (isMocking) {
+                val currentMockLocation = _currentLocation.value
+                    ?: settingsStore.currentLocation.first()
+                    ?: return@launch
+
+                val mockedLocation = Location("mock").apply {
+                    latitude = currentMockLocation.latitude
+                    longitude = currentMockLocation.longitude
+                    altitude = currentMockLocation.altitude
+                }
+                emitCameraLocation(mockedLocation)
+                return@launch
+            }
+
             val useFLP = settingsStore.useGooglePlayServices.first()
 
             // Recenter only from immediately available cached location to avoid

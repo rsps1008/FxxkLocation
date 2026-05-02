@@ -85,13 +85,17 @@ fun MainScreen(
         }
     }
 
-    LaunchedEffect(mapLibreMapRef.value, currentLocation, selectedLoc.latitude, selectedLoc.longitude) {
+    LaunchedEffect(mapLibreMapRef.value, isMocking, currentLocation, selectedLoc.latitude, selectedLoc.longitude) {
         if (hasInitializedInitialCamera) return@LaunchedEffect
 
         val map = mapLibreMapRef.value ?: return@LaunchedEffect
-        val initialTarget = currentLocation?.let {
-            LatLng(it.latitude, it.longitude)
-        } ?: LatLng(selectedLoc.latitude, selectedLoc.longitude)
+        val initialTarget = if (isMocking) {
+            LatLng(selectedLoc.latitude, selectedLoc.longitude)
+        } else {
+            currentLocation?.let {
+                LatLng(it.latitude, it.longitude)
+            } ?: LatLng(selectedLoc.latitude, selectedLoc.longitude)
+        }
 
         map.animateCamera(
             CameraUpdateFactory.newCameraPosition(

@@ -86,6 +86,7 @@
 - 主畫面現在另外會顯示一個藍色的 current location 標記，用來表示系統目前回報的位置；紅色標記則維持代表使用者選定的虛擬目標點。
 - 主畫面地圖不會再因為 `selectedLocation` 或 current location 更新而自動把鏡頭拉回去；鏡頭只會在使用者按 `Locate Me` 時主動 recenter。
 - 進入主畫面時，地圖會優先以最後一次記錄的 current location 作為初始鏡頭位置，沒有 current location 時才退回到 `selectedLocation`。
+- 當 mock 正在執行時，`MainViewModel` 會避免再去刷新真實 current location，以免把 current location 狀態覆寫回真實位置；此時 `Locate Me` 會優先使用已知的 mock/current 快照，而不是重新抓真實定位。
 - 設定頁提供快速跳轉到系統權限／開發者選項／電池最佳化頁面。
 
 ## 專案結構
