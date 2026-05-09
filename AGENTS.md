@@ -80,7 +80,8 @@
 - 可設定自動停止時間。
 - 可設定 App 啟動時自動以最後位置恢復 mock。
 - 以常駐通知顯示執行中狀態與自動停止倒數。
-- 設定頁提供中文／英文的 App 內語言切換，`MainViewModel` 的 toast 訊息也已改為字串資源，會跟著語言同步切換。
+- App 會依系統語言自動套用語系；若系統語言為任何中文，會統一映射成繁體中文。設定頁不再提供中文／英文切換。
+- `MainViewModel` 的 toast 訊息已改為字串資源，會跟著目前套用的語系同步切換。
 - 當正在虛擬定位時，主畫面右下角的 `Locate Me` 按鈕會以灰階樣式顯示；按下後仍會以目前系統回報的位置更新地圖。一旦停止虛擬定位，ViewModel 會立刻嘗試抓取真實定位與高度，並回寫到 camera / altitude 狀態。
 - 當主畫面尚未啟動虛擬定位時，下方的 `X` 停止按鈕會維持灰階外觀，且點擊不會有反應；只有 mock 正在執行時才會真的停止。
 - 主畫面現在另外會顯示一個藍色的 current location 標記，用來表示系統目前回報的位置；紅色標記則維持代表使用者選定的虛擬目標點。
@@ -112,8 +113,17 @@
   - 進畫面時會先以最後記錄的 current location 當作初始鏡頭位置；若沒有 current location，才退回 `selectedLocation`。
 
 - `app/src/main/java/com/rsps1008/fxxklocation/ui/screen/SettingsScreen.kt`
-  - 管理語言、漂移、海拔、Google 服務、自動停止、自動啟動等設定。
+  - 管理漂移、海拔、Google 服務、自動停止、自動啟動等設定。
   - 顯示系統狀態並提供修復入口。
+
+### 對外網站文件
+
+- `docs/index.html`
+  - GitHub Pages 風格的專案首頁。
+  - 目前內容用來介紹 FxxkLocation 的核心功能、使用前置條件與隱私政策入口。
+- `docs/privacy-policy/index.html`
+  - 對外公開的隱私權政策頁面。
+  - 目前內容以「資料主要保存在裝置上、沒有自有後端」為主軸，並說明定位、通知與 Google Play Services 相關使用情境。
 
 ### ViewModel 層
 
@@ -168,8 +178,8 @@
   - 對 Xiaomi / Redmi / Poco 有額外電池最佳化跳轉嘗試。
 
 - `app/src/main/java/com/rsps1008/fxxklocation/util/LanguageHelper.kt`
-  - 集中處理 App 內語言切換。
-  - 目前支援英文與繁體中文。
+  - 集中處理 App 語系與系統語言映射。
+  - 目前觀察到的規則是：系統若為任何中文語系，就套用繁體中文；否則沿用預設語系。
 
 ## 權限與 Manifest 重點
 
@@ -199,6 +209,7 @@
 7. 目前 MapLibre `MapView` 是包在 Compose `AndroidView` 內，初始化時需要主動補 `onCreate`、`onStart`、`onResume`，否則首次進畫面可能只看到藍色底而沒有實際底圖。
 8. `demotiles.maplibre.org` 的 demo style 會依賴遠端 glyph 與向量樣式資源；若模擬器或網路環境無法穩定連線，容易只剩藍底。現階段已改為較單純的 OSM raster style 以降低這類問題。
 9. 若 log 出現 `Unable to resolve host "tile.openstreetmap.org"`，代表目前執行裝置或模擬器的 DNS / 網路環境無法解析外部圖磚網域。這種情況下 MapLibre 會只顯示空白底圖，屬於環境連線問題，不是地圖選點邏輯本身失效。
+10. `docs/index.html` 與 `docs/privacy-policy/index.html` 屬於對外公開頁面，內容需要隨 App 實際功能同步更新，尤其是資料儲存、定位使用與第三方服務說明。
 
 ## 建議的後續維護方向
 
@@ -212,7 +223,7 @@
 - 修改 UI 時，請同步確認字串資源是否需要一起更新。
 - 修改定位、權限、前景服務行為時，請同步更新本檔的「權限與 Manifest 重點」與「已知觀察與風險」。
 - 修改設定欄位時，請同步更新 `SettingsStore` 說明與已保存欄位列表。
-- 若新增或修改提示字串，請確認英文與中文資源都已補齊，避免語言切換後出現半套文案。
+- 若新增或修改提示字串，請確認英文與中文資源都已補齊，避免系統語系切換後出現半套文案。
 - 若發現裝置相容性問題，請記錄：
   - 裝置品牌 / 型號
   - Android 版本

@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#145f6f">
+  <title>FxxkLocation</title>
+  <meta name="description" content="FxxkLocation 是一款 Android Fake GPS App，支援指定座標、隨機漂移、真實高度、Google Play Services 與自動停止功能。">
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #eef8f7;
+      --bg-2: #f8f2e7;
+      --panel: rgba(255, 255, 255, 0.92);
+      --text: #152432;
+      --muted: #5c6b76;
+      --accent: #0f7c8c;
+      --accent-2: #ff9f43;
+      --accent-strong: #0b5661;
+      --border: #d4e4e1;
+      --shadow: 0 22px 60px rgba(13, 35, 44, 0.10);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      line-height: 1.75;
+      font-family: "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(15, 124, 140, 0.16), transparent 28%),
+        radial-gradient(circle at top right, rgba(255, 159, 67, 0.16), transparent 24%),
+        linear-gradient(180deg, var(--bg), var(--bg-2));
+    }
+
+    main {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 56px;
+    }
+
+    .hero {
+      display: grid;
+      gap: 18px;
+      margin-bottom: 20px;
+      padding: 34px 32px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .eyebrow {
+      margin: 0;
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .title-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2.2rem, 4.5vw, 4rem);
+      line-height: 1.04;
+      letter-spacing: -0.03em;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(15, 124, 140, 0.18);
+      background: rgba(15, 124, 140, 0.08);
+      color: var(--accent);
+      font-size: 0.92rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .lead {
+      max-width: 800px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.9;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 6px;
+    }
+
+    .button,
+    .button-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      padding: 0 18px;
+      border-radius: 999px;
+      text-decoration: none;
+      font-weight: 800;
+      transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+    }
+
+    .button {
+      color: #f7fffe;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      box-shadow: 0 12px 26px rgba(15, 124, 140, 0.24);
+    }
+
+    .button-secondary {
+      color: var(--accent-strong);
+      background: rgba(15, 124, 140, 0.08);
+      border: 1px solid rgba(15, 124, 140, 0.14);
+    }
+
+    .button:hover,
+    .button-secondary:hover {
+      transform: translateY(-1px);
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 7px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(92, 107, 118, 0.16);
+      background: rgba(255, 255, 255, 0.76);
+      color: var(--muted);
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      padding: 24px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 1.18rem;
+      line-height: 1.35;
+    }
+
+    p {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 1.2rem;
+      line-height: 1.9;
+    }
+
+    li + li {
+      margin-top: 4px;
+    }
+
+    a {
+      color: var(--accent-strong);
+      text-decoration-thickness: 1.5px;
+      text-underline-offset: 2px;
+      word-break: break-word;
+    }
+
+    .feature-list {
+      display: grid;
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    .feature {
+      padding: 16px 18px;
+      border-radius: 18px;
+      border: 1px solid rgba(92, 107, 118, 0.14);
+      background: rgba(255, 255, 255, 0.72);
+    }
+
+    .feature strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 1rem;
+      color: var(--text);
+    }
+
+    .feature p {
+      color: var(--muted);
+      font-size: 0.97rem;
+    }
+
+    .note {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-left: 4px solid var(--accent-2);
+      border-radius: 12px;
+      background: rgba(255, 159, 67, 0.08);
+      color: var(--muted);
+    }
+
+    .footer {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      text-align: center;
+    }
+
+    @media (max-width: 760px) {
+      main {
+        width: min(100% - 20px, 720px);
+        padding: 16px 0 32px;
+      }
+
+      .hero,
+      .card {
+        border-radius: 18px;
+      }
+
+      .hero {
+        padding: 24px 18px;
+      }
+
+      .card {
+        padding: 18px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <p class="eyebrow">Fake GPS for Android</p>
+      <div class="title-row">
+        <h1>FxxkLocation</h1>
+        <span class="pill">FxxkLocation Android App</span>
+      </div>
+      <p class="lead">
+        FxxkLocation 是一款 Android 虛擬定位 App，能讓你選擇指定座標、模擬較自然的移動漂移、
+        設定真實或手動海拔，並透過前景服務、常駐通知與自動停止機制維持長時間運作。
+      </p>
+      <div class="actions">
+        <a class="button" href="https://github.com/rsps1008/FxxkLocation" target="_blank" rel="noreferrer">查看專案</a>
+        <a class="button-secondary" href="privacy-policy/">隱私權政策</a>
+      </div>
+      <div class="chips" aria-label="features">
+        <span class="chip">指定座標模擬</span>
+        <span class="chip">隨機漂移</span>
+        <span class="chip">高度設定</span>
+        <span class="chip">Google Play Services</span>
+        <span class="chip">自動停止</span>
+        <span class="chip">自動啟動</span>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2>核心功能</h2>
+        <div class="feature-list">
+          <div class="feature">
+            <strong>虛擬定位與地圖選點</strong>
+            <p>可在地圖上直接選擇目標位置，並將裝置定位切換到該座標。</p>
+          </div>
+          <div class="feature">
+            <strong>隨機漂移與海拔變化</strong>
+            <p>可啟用較自然的漂移效果，讓位置每隔幾秒在設定半徑內小幅移動，並同步微調海拔。</p>
+          </div>
+          <div class="feature">
+            <strong>真實定位與 Google Play Services</strong>
+            <p>可選擇使用系統定位或 Google Play Services 取得目前位置，方便回到真實座標或刷新高度。</p>
+          </div>
+          <div class="feature">
+            <strong>前景服務與自動停止</strong>
+            <p>透過前景服務持續推送 mock location，並可設定倒數時間，時間到自動停止。</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>使用前準備</h2>
+        <ul>
+          <li>先開啟 Android 的開發人員選項。</li>
+          <li>在開發人員選項中，將此 App 設為 mock location app。</li>
+          <li>授予位置權限；若要顯示通知或常駐服務，也請授予通知權限。</li>
+          <li>建議關閉或略過電池最佳化，避免前景服務被系統回收。</li>
+          <li>若裝置上的 GPS 與定位服務不穩定，請先確認系統層級定位已啟用。</li>
+        </ul>
+
+        <div class="note">
+          這個 App 的設計重點是長時間穩定 mock location，而不是只做一次性的座標切換。
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>適合什麼情境</h2>
+        <ul>
+          <li>需要測試地圖、打卡或地理位置流程的 Android 開發情境</li>
+          <li>想以指定座標進行定位模擬的除錯或驗證流程</li>
+          <li>希望用較自然的漂移與海拔變化模擬行進中的位置</li>
+          <li>想在同一個 App 裡管理自動停止與啟動時恢復上次位置</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h2>公開資訊</h2>
+        <p>
+          若你想了解這個 App 如何處理資料、哪些資訊會留在裝置上、以及第三方定位服務怎麼參與，
+          請先閱讀隱私權政策頁面。
+        </p>
+        <div class="note">
+          最後更新日期：2026 年 5 月 9 日
+        </div>
+        <ul style="margin-top: 16px;">
+          <li><a href="privacy-policy/">隱私權政策</a></li>
+          <li><a href="https://github.com/rsps1008/FxxkLocation" target="_blank" rel="noreferrer">GitHub Repository</a></li>
+          <li><a href="https://github.com/rsps1008/FxxkLocation/issues" target="_blank" rel="noreferrer">問題回報</a></li>
+        </ul>
+      </article>
+    </section>
+
+    <p class="footer">FxxkLocation - Fake GPS for Android</p>
+  </main>
+</body>
+</html>

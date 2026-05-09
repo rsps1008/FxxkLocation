@@ -11,12 +11,14 @@ import androidx.navigation.compose.rememberNavController
 import com.rsps1008.fxxklocation.ui.screen.MainScreen
 import com.rsps1008.fxxklocation.ui.screen.SettingsScreen
 import com.rsps1008.fxxklocation.ui.theme.FxxkLocationTheme
+import com.rsps1008.fxxklocation.util.LanguageHelper
 import com.rsps1008.fxxklocation.viewmodel.MainViewModel
 import com.rsps1008.fxxklocation.viewmodel.SettingsViewModel
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        LanguageHelper.syncWithSystemLanguage(this)
         enableEdgeToEdge()
         setContent {
             FxxkLocationTheme {
@@ -40,5 +42,10 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        LanguageHelper.syncWithSystemLanguage(this)
     }
 }

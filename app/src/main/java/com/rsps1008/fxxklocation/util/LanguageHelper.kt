@@ -5,19 +5,18 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 
 object LanguageHelper {
-    const val LANGUAGE_ENGLISH = "en"
     const val LANGUAGE_CHINESE_TRADITIONAL = "zh-TW"
 
-    fun currentLanguageTag(context: Context): String {
-        val locale = context.resources.configuration.locales[0]?.toLanguageTag().orEmpty()
-        return if (locale.startsWith("zh")) {
-            LANGUAGE_CHINESE_TRADITIONAL
+    fun syncWithSystemLanguage(context: Context) {
+        val locale = context.resources.configuration.locales[0]
+        val desiredLocales = if (locale.language.equals("zh", ignoreCase = true)) {
+            LocaleListCompat.forLanguageTags(LANGUAGE_CHINESE_TRADITIONAL)
         } else {
-            LANGUAGE_ENGLISH
+            LocaleListCompat.getEmptyLocaleList()
         }
-    }
 
-    fun applyLanguage(languageTag: String) {
-        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(languageTag))
+        if (AppCompatDelegate.getApplicationLocales() != desiredLocales) {
+            AppCompatDelegate.setApplicationLocales(desiredLocales)
+        }
     }
 }
