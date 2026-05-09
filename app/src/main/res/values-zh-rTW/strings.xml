@@ -33,6 +33,12 @@
     <string name="fix">修復</string>
     <string name="back">返回</string>
     <string name="locate_me">定位到目前位置</string>
+    <string name="search_place_label">搜尋地點（不支援精準搜尋）</string>
+    <string name="search_place_hint">輸入地標或地址</string>
+    <string name="search_place_button">搜尋地點</string>
+    <string name="search_place_empty">請輸入地標或地址。</string>
+    <string name="search_place_not_found">找不到符合的地點。</string>
+    <string name="search_place_failed">暫時無法搜尋地點，請稍後再試。</string>
     <string name="notification_title">模擬位置執行中</string>
     <string name="notification_text">正在模擬位置更新…</string>
     <string name="notification_text_auto_stop">正在模擬位置（%d 分鐘後自動停止）</string>

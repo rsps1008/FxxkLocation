@@ -72,6 +72,7 @@
 ## 目前功能整理
 
 - 在主畫面以地圖選擇目標位置。
+- 可在主畫面搜尋地標或地址，搜尋結果只會平移地圖視窗，不會改動紅色選定目標點；目前搜尋屬於近似搜尋，標頭會顯示「搜尋地點（不支援精準搜尋）」，框內提示則保留「輸入地標或地址」。
 - 可點擊「Locate Me」取得目前真實位置並同步更新海拔。
 - 啟動前景服務持續送出 mock location。
 - 可設定隨機漫步漂移，每 2 秒沿著上一個位置附近小步移動，並維持在設定的漂移半徑內，同時更新微幅海拔變化。
@@ -82,13 +83,18 @@
 - 以常駐通知顯示執行中狀態與自動停止倒數。
 - App 會依系統語言自動套用語系；若系統語言為任何中文，會統一映射成繁體中文。設定頁不再提供中文／英文切換。
 - `MainViewModel` 的 toast 訊息已改為字串資源，會跟著目前套用的語系同步切換。
-- 當正在虛擬定位時，主畫面右下角的 `Locate Me` 按鈕會以灰階樣式顯示；按下後仍會以目前系統回報的位置更新地圖。一旦停止虛擬定位，ViewModel 會立刻嘗試抓取真實定位與高度，並回寫到 camera / altitude 狀態。
+- 當正在虛擬定位時，主畫面右下角的 `Locate Me` 按鈕會以灰階樣式顯示；按下後仍會以目前系統回報的位置更新地圖。一旦停止虛擬定位，ViewModel 會立刻嘗試抓取真實定位與高度，並回寫到 camera / altitude 狀態。停止後再按 `Locate Me` 時，會主動向系統請求 current location，而不是只讀快取。
 - 當主畫面尚未啟動虛擬定位時，下方的 `X` 停止按鈕會維持灰階外觀，且點擊不會有反應；只有 mock 正在執行時才會真的停止。
 - 主畫面現在另外會顯示一個藍色的 current location 標記，用來表示系統目前回報的位置；紅色標記則維持代表使用者選定的虛擬目標點。
 - 主畫面地圖不會再因為 `selectedLocation` 或 current location 更新而自動把鏡頭拉回去；鏡頭只會在使用者按 `Locate Me` 時主動 recenter。
 - 進入主畫面時，地圖會優先以最後一次記錄的 current location 作為初始鏡頭位置，沒有 current location 時才退回到 `selectedLocation`。
 - 當 mock 正在執行時，`MainViewModel` 會避免再去刷新真實 current location，以免把 current location 狀態覆寫回真實位置；此時 `Locate Me` 會優先使用已知的 mock/current 快照，而不是重新抓真實定位。
 - 設定頁提供快速跳轉到系統權限／開發者選項／電池最佳化頁面。
+- 目前可 runtime request 的權限包含位置與通知；這兩項會先走 Android runtime permission，只有在被 OS 拒絕後才跳 App 設定頁。電池最佳化與 mock app 指定屬於系統設定流程，不是 runtime permission，但也會優先走對應的 OS 頁面，再視情況回到 App 設定頁。
+- 通知權限在 Android 13+ 會優先走 OS 層級的 runtime permission request；只有在使用者拒絕或無法直接請求時，才回到 App 設定頁當 fallback。
+- 主畫面按下開始後，若缺位置權限會先請求位置權限，接著再自動請求通知權限，不需要再按一次開始；若仍缺系統設定類條件，才會跳出「需要權限」對話框並導到設定頁，而不是直接打開 App OS 設定頁。
+- 權限頁面有時在剛回到 App 時會短暫維持舊狀態，因此 `checkStatus()` 會搭配一個短延遲的第二次刷新，避免剛調好權限卻仍顯示「修復」。
+- `isIgnoringBatteryOptimizations` 在部分裝置上回寫更慢，現在有額外的延遲刷新專門補這一項，避免使用者回來後仍看到舊的「修復」狀態。
 
 ## 專案結構
 
@@ -104,9 +110,10 @@
 - `app/src/main/java/com/rsps1008/fxxklocation/ui/screen/MainScreen.kt`
   - 顯示 MapLibre 地圖。
   - 點地圖可更新目標座標。
+  - 地圖與 `Locate Me` 按鈕之間有一個直接貼在背景上的地標搜尋列；標頭與框內提示分開顯示，搜尋結果會透過 OpenStreetMap Nominatim 取得座標，並只移動地圖鏡頭，不會變更 `selectedLocation`。
   - 可啟動／停止 mock。
   - 會在 `ON_RESUME` 時重新檢查系統狀態。
-  - 右下角定位按鈕在虛擬定位時會以灰階樣式顯示；按下後只負責將地圖鏡頭拉回「裝置目前位置」並放大到約 `zoom 16.5`，行為接近 Google Maps 的 recenter 按鈕；它不會修改使用者手動選定的 `selectedLocation`。
+  - 右下角定位按鈕在虛擬定位時會以灰階樣式顯示；按下後只負責將地圖鏡頭拉回「裝置目前位置」並放大到約 `zoom 16.5`，行為接近 Google Maps 的 recenter 按鈕；它不會修改使用者手動選定的 `selectedLocation`。非 mock 狀態下會主動抓 current location，讓系統顯示定位中的提示。
   - 下方停止按鈕在 mock 尚未啟動時會是灰階外觀且不會有反應；只有 mock 正在執行時才可停止。
   - 地圖上另外會顯示一個藍色 current location 標記，和紅色目標點分開顯示。
   - 地圖鏡頭不會因狀態更新自動回正，只有定位按鈕會主動 recenter。
@@ -132,7 +139,7 @@
   - 讀取最後定位。
   - 啟停 `MockLocationService`。
   - 處理自動啟動、定位自己、刷新真實海拔。
-  - `centerMapOnCurrentLocation()` 目前只使用立即可取得的 cached / last known location 來移動鏡頭，不再做延後補抓，因此不會在使用者已再次拖曳地圖後，過幾秒又把鏡頭強制拉回去；整個流程都不會覆寫 `selectedLocation`，且只有定位失敗時才提示訊息。
+  - `centerMapOnCurrentLocation()` 在 mock 狀態下只使用目前已知的 mock/current 快照；非 mock 狀態下會主動請求 current location。整個流程都不會覆寫 `selectedLocation`，且只有定位失敗時才提示訊息。
   - 使用字串資源發送 toast 訊息，避免語言切換後還有硬編碼英文提示。
   - 當 mock 狀態從 `true` 切到 `false` 時，會自動啟動一輪真實定位查詢，優先 current location，失敗才 fallback 到 last known。
 
@@ -209,7 +216,8 @@
 7. 目前 MapLibre `MapView` 是包在 Compose `AndroidView` 內，初始化時需要主動補 `onCreate`、`onStart`、`onResume`，否則首次進畫面可能只看到藍色底而沒有實際底圖。
 8. `demotiles.maplibre.org` 的 demo style 會依賴遠端 glyph 與向量樣式資源；若模擬器或網路環境無法穩定連線，容易只剩藍底。現階段已改為較單純的 OSM raster style 以降低這類問題。
 9. 若 log 出現 `Unable to resolve host "tile.openstreetmap.org"`，代表目前執行裝置或模擬器的 DNS / 網路環境無法解析外部圖磚網域。這種情況下 MapLibre 會只顯示空白底圖，屬於環境連線問題，不是地圖選點邏輯本身失效。
-10. `docs/index.html` 與 `docs/privacy-policy/index.html` 屬於對外公開頁面，內容需要隨 App 實際功能同步更新，尤其是資料儲存、定位使用與第三方服務說明。
+10. 主畫面的地標搜尋會依賴 `nominatim.openstreetmap.org`；如果該服務或網路不可用，搜尋只會失敗，不會影響既有 mock 流程。
+11. `docs/index.html` 與 `docs/privacy-policy/index.html` 屬於對外公開頁面，內容需要隨 App 實際功能同步更新，尤其是資料儲存、定位使用與第三方服務說明。
 
 ## 建議的後續維護方向
 

@@ -80,6 +80,20 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun refreshStatusAfterTransition() {
+        viewModelScope.launch {
+            delay(300)
+            checkStatus()
+        }
+    }
+
+    fun refreshBatteryOptimizationStatusAfterTransition() {
+        viewModelScope.launch {
+            delay(1200)
+            _isIgnoringBatteryOptimizations.value = SystemCheckUtil.isIgnoringBatteryOptimizations(context)
+        }
+    }
+
     fun setEnableDrift(enabled: Boolean) {
         viewModelScope.launch {
             settingsStore.setEnableDrift(enabled)

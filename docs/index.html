@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#145f6f">
   <title>FxxkLocation</title>
-  <meta name="description" content="FxxkLocation 是一款 Android Fake GPS App，支援指定座標、隨機漂移、真實高度、Google Play Services 與自動停止功能。">
+  <meta name="description" content="FxxkLocation 是一款 Android Fake GPS App，支援指定座標、地標搜尋、隨機漂移、真實高度、Google Play Services 與自動停止功能。">
   <style>
     :root {
       color-scheme: light;
@@ -285,6 +285,7 @@
       </div>
       <div class="chips" aria-label="features">
         <span class="chip">指定座標模擬</span>
+        <span class="chip">地標搜尋</span>
         <span class="chip">隨機漂移</span>
         <span class="chip">高度設定</span>
         <span class="chip">Google Play Services</span>
@@ -304,6 +305,10 @@
           <div class="feature">
             <strong>隨機漂移與海拔變化</strong>
             <p>可啟用較自然的漂移效果，讓位置每隔幾秒在設定半徑內小幅移動，並同步微調海拔。</p>
+          </div>
+          <div class="feature">
+            <strong>地標搜尋與視窗平移</strong>
+            <p>可直接搜尋地標或地址，透過 OpenStreetMap Nominatim 找到對應位置後，只平移地圖視窗，不會改變你已選定的目標點。</p>
           </div>
           <div class="feature">
             <strong>真實定位與 Google Play Services</strong>

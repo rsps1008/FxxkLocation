@@ -1,5 +1,7 @@
 package com.rsps1008.fxxklocation.ui.screen
 
+import android.Manifest
+import android.os.Build
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -17,6 +19,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.rsps1008.fxxklocation.R
@@ -43,6 +47,26 @@ fun SettingsScreen(
     val isGpsEnabled by viewModel.isGpsEnabled.collectAsState()
     val isMockAppSet by viewModel.isMockAppSet.collectAsState()
     val isIgnoringBatteryOptimizations by viewModel.isIgnoringBatteryOptimizations.collectAsState()
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        viewModel.checkStatus()
+        viewModel.refreshStatusAfterTransition()
+        viewModel.refreshBatteryOptimizationStatusAfterTransition()
+        if (!granted) {
+            SystemCheckUtil.openAppSettings(context)
+        }
+    }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        viewModel.checkStatus()
+        viewModel.refreshStatusAfterTransition()
+        viewModel.refreshBatteryOptimizationStatusAfterTransition()
+        if (!granted) {
+            SystemCheckUtil.openAppSettings(context)
+        }
+    }
 
     var driftRadiusInput by remember { mutableStateOf("") }
     var manualAltitudeInput by remember { mutableStateOf("") }
@@ -83,6 +107,8 @@ fun SettingsScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewModel.checkStatus()
+                viewModel.refreshStatusAfterTransition()
+                viewModel.refreshBatteryOptimizationStatusAfterTransition()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -116,8 +142,20 @@ fun SettingsScreen(
                 Text(stringResource(R.string.system_permissions), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(8.dp)) {
-                        StatusItem(stringResource(R.string.location_permission), hasPermission) { SystemCheckUtil.openAppSettings(context) }
-                        StatusItem(stringResource(R.string.notification_permission), hasNotificationPermission) { SystemCheckUtil.openAppSettings(context) }
+                        StatusItem(stringResource(R.string.location_permission), hasPermission) {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                            } else {
+                                SystemCheckUtil.openAppSettings(context)
+                            }
+                        }
+                        StatusItem(stringResource(R.string.notification_permission), hasNotificationPermission) {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                SystemCheckUtil.openAppSettings(context)
+                            }
+                        }
                         StatusItem(stringResource(R.string.gps_enabled), isGpsEnabled) { SystemCheckUtil.openLocationSettings(context) }
                         StatusItem(stringResource(R.string.mock_app_selected), isMockAppSet) { SystemCheckUtil.openDevelopmentSettings(context) }
                         StatusItem(stringResource(R.string.ignore_battery_optimization), isIgnoringBatteryOptimizations) { SystemCheckUtil.openBatteryOptimizationSettings(context) }

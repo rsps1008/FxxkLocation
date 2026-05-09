@@ -1,22 +1,33 @@
 package com.rsps1008.fxxklocation.ui.screen
 
+import android.Manifest
+import android.os.Build
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.ActivityResultLauncher
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color as AndroidColor
@@ -24,7 +35,9 @@ import android.graphics.Paint
 import android.widget.Toast
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.text.input.ImeAction
 import com.rsps1008.fxxklocation.R
+import com.rsps1008.fxxklocation.util.SystemCheckUtil
 import com.rsps1008.fxxklocation.viewmodel.MainViewModel
 import org.maplibre.android.annotations.IconFactory
 import org.maplibre.android.MapLibre
@@ -47,21 +60,60 @@ fun MainScreen(
     val context = LocalContext.current
     val isMocking by viewModel.isMocking.collectAsState()
     val isApplied by viewModel.isApplied.collectAsState()
-    val hasPermission by viewModel.hasPermission.collectAsState()
-    val hasNotificationPermission by viewModel.hasNotificationPermission.collectAsState()
-    val isGpsEnabled by viewModel.isGpsEnabled.collectAsState()
-    val isMockAppSet by viewModel.isMockAppSet.collectAsState()
-    val isIgnoringBatteryOptimizations by viewModel.isIgnoringBatteryOptimizations.collectAsState()
     val currentLocation by viewModel.currentLocation.collectAsState()
     
     val lifecycleOwner = LocalLifecycleOwner.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     var showPermissionDialog by remember { mutableStateOf(false) }
+    var pendingStartMock by remember { mutableStateOf(false) }
     var hasInitializedInitialCamera by remember { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     val mapViewRef = remember { mutableStateOf<MapView?>(null) }
     val mapLibreMapRef = remember { mutableStateOf<MapLibreMap?>(null) }
     val markerRef = remember { mutableStateOf<Marker?>(null) }
     val currentMarkerRef = remember { mutableStateOf<Marker?>(null) }
     val currentLocationIcon = remember(context) { createCurrentLocationIcon(context) }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        viewModel.checkStatus()
+        viewModel.refreshStatusAfterTransition()
+        if (granted) {
+            attemptStartMockFlow(
+                context = context,
+                viewModel = viewModel,
+                pendingStartMock = pendingStartMock,
+                onPendingStartMockChanged = { pendingStartMock = it },
+                showPermissionDialog = { showPermissionDialog = it },
+                locationPermissionLauncher = null,
+                notificationPermissionLauncher = null
+            )
+        } else {
+            pendingStartMock = false
+            showPermissionDialog = true
+        }
+    }
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        viewModel.checkStatus()
+        viewModel.refreshStatusAfterTransition()
+        if (granted) {
+            attemptStartMockFlow(
+                context = context,
+                viewModel = viewModel,
+                pendingStartMock = pendingStartMock,
+                onPendingStartMockChanged = { pendingStartMock = it },
+                showPermissionDialog = { showPermissionDialog = it },
+                locationPermissionLauncher = null,
+                notificationPermissionLauncher = notificationPermissionLauncher
+            )
+        } else {
+            pendingStartMock = false
+            showPermissionDialog = true
+        }
+    }
 
     val selectedLoc = viewModel.selectedLocation
 
@@ -114,6 +166,7 @@ fun MainScreen(
                 Lifecycle.Event.ON_START -> mapViewRef.value?.onStart()
                 Lifecycle.Event.ON_RESUME -> {
                     viewModel.checkStatus()
+                    viewModel.refreshStatusAfterTransition()
                     mapViewRef.value?.onResume()
                 }
                 Lifecycle.Event.ON_PAUSE -> mapViewRef.value?.onPause()
@@ -166,11 +219,17 @@ fun MainScreen(
             )
         }
     ) { padding ->
+        val triggerSearch = {
+            keyboardController?.hide()
+            focusManager.clearFocus()
+            viewModel.searchPlace(searchQuery)
+        }
+
         Column(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(horizontal = 8.dp, vertical = 0.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Map Section (MapLibre)
@@ -260,6 +319,43 @@ fun MainScreen(
                 }
             }
 
+            // Search Section
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.search_place_label),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        placeholder = { Text(stringResource(R.string.search_place_hint)) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = { triggerSearch() })
+                    )
+                    FilledIconButton(
+                        onClick = triggerSearch,
+                        enabled = searchQuery.isNotBlank(),
+                        modifier = Modifier.size(56.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = stringResource(R.string.search_place_button)
+                        )
+                    }
+                }
+            }
+
             // Controls
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -268,11 +364,16 @@ fun MainScreen(
                 LargeFloatingActionButton(
                     onClick = { 
                         if (!isApplied) {
-                            if (hasPermission && isMockAppSet && isGpsEnabled && isIgnoringBatteryOptimizations && hasNotificationPermission) {
-                                viewModel.startMock()
-                            } else {
-                                showPermissionDialog = true
-                            }
+                            pendingStartMock = true
+                            attemptStartMockFlow(
+                                context = context,
+                                viewModel = viewModel,
+                                pendingStartMock = pendingStartMock,
+                                onPendingStartMockChanged = { pendingStartMock = it },
+                                showPermissionDialog = { showPermissionDialog = it },
+                                locationPermissionLauncher = locationPermissionLauncher,
+                                notificationPermissionLauncher = notificationPermissionLauncher
+                            )
                         }
                     },
                     containerColor = if (isApplied) Color.LightGray else MaterialTheme.colorScheme.primaryContainer
@@ -352,4 +453,33 @@ private fun createCurrentLocationIcon(context: android.content.Context): org.map
     canvas.drawCircle(center, center, size * 0.18f, innerPaint)
 
     return IconFactory.getInstance(context).fromBitmap(bitmap)
+}
+
+private fun attemptStartMockFlow(
+    context: android.content.Context,
+    viewModel: MainViewModel,
+    pendingStartMock: Boolean,
+    onPendingStartMockChanged: (Boolean) -> Unit,
+    showPermissionDialog: (Boolean) -> Unit,
+    locationPermissionLauncher: ActivityResultLauncher<String>?,
+    notificationPermissionLauncher: ActivityResultLauncher<String>?
+) {
+    if (!pendingStartMock) return
+
+    when {
+        !SystemCheckUtil.hasLocationPermission(context) -> {
+            locationPermissionLauncher?.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        !SystemCheckUtil.hasNotificationPermission(context) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
+            notificationPermissionLauncher?.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        !SystemCheckUtil.isGpsEnabled(context) || !SystemCheckUtil.isMockLocationEnabled(context) || !SystemCheckUtil.isIgnoringBatteryOptimizations(context) -> {
+            onPendingStartMockChanged(false)
+            showPermissionDialog(true)
+        }
+        else -> {
+            onPendingStartMockChanged(false)
+            viewModel.startMock()
+        }
+    }
 }

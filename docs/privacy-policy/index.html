@@ -213,7 +213,7 @@
 
     <section class="card">
       <div class="summary">
-        <p><strong>FxxkLocation</strong> 是一款 Android 虛擬定位 App，主要功能包含座標選點、mock location、隨機漂移、海拔設定、前景服務與自動停止。</p>
+        <p><strong>FxxkLocation</strong> 是一款 Android 虛擬定位 App，主要功能包含座標選點、地標搜尋、mock location、隨機漂移、海拔設定、前景服務與自動停止。</p>
         <p>這份隱私權政策說明目前版本會處理哪些資料、資料儲存在哪裡，以及你如何管理自己的資料。</p>
       </div>
 
@@ -229,6 +229,7 @@
         <li>你手動選定或最後使用的模擬座標。</li>
         <li>你設定的海拔值、漂移半徑、是否啟用隨機漂移、自動停止時間、是否自動啟動等偏好設定。</li>
         <li>裝置目前位置資訊，僅在你使用「Locate Me」、刷新目前位置或需要取得真實海拔時使用。</li>
+        <li>若你使用首頁地標搜尋功能，App 會將你輸入的搜尋字串送往 OpenStreetMap Nominatim，以取得對應的地標座標並平移地圖視窗。</li>
         <li>若你啟用 Google Play Services 相關定位流程，App 會透過系統與 Google 提供的位置服務取得目前位置資料。</li>
         <li>App 為了顯示狀態、管理前景服務與通知所需的本機執行資訊。</li>
       </ul>
@@ -254,6 +255,7 @@
       <h2>5. 第三方服務</h2>
       <ul>
         <li>Google Play Services / Fused Location Provider</li>
+        <li>OpenStreetMap Nominatim 地標搜尋服務</li>
         <li>Android 系統定位與通知機制</li>
       </ul>
       <p>當你啟用相關功能時，資料會依 Google 與 Android 的服務條款及隱私政策處理。</p>
@@ -262,7 +264,7 @@
       <ul>
         <li>我們不會販售你的個人資料。</li>
         <li>我們不會把你的 mock 目標或設定提供給廣告商或行銷商。</li>
-        <li>只有在你主動使用系統定位或 Google Play Services 相關功能時，資料才會送出到對應的系統或服務。</li>
+        <li>只有在你主動使用系統定位、Google Play Services 相關功能或地標搜尋時，資料才會送出到對應的系統或服務。</li>
         <li>只有在你啟用前景服務與通知時，App 才會發出持續通知以維持執行狀態。</li>
       </ul>
 
@@ -278,7 +280,7 @@
         <li><strong>位置權限</strong>：用來取得目前位置、真實海拔，並支援模擬定位流程。</li>
         <li><strong>通知權限</strong>：用來顯示前景服務通知與狀態資訊。</li>
         <li><strong>前景服務權限</strong>：用來讓 mock location 在背景持續執行。</li>
-        <li><strong>網路權限</strong>：用來存取地圖圖磚與系統／Google 定位服務。</li>
+        <li><strong>網路權限</strong>：用來存取地圖圖磚、OpenStreetMap Nominatim 與系統／Google 定位服務。</li>
       </ul>
 
       <h2>9. 資料保存與刪除</h2>

@@ -19,6 +19,7 @@ import com.rsps1008.fxxklocation.data.model.LocationData
 import com.rsps1008.fxxklocation.data.store.SettingsStore
 import com.rsps1008.fxxklocation.service.MockLocationService
 import com.rsps1008.fxxklocation.util.SystemCheckUtil
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +27,11 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val context = application.applicationContext
@@ -288,11 +294,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isIgnoringBatteryOptimizations.value = SystemCheckUtil.isIgnoringBatteryOptimizations(context)
     }
 
+    fun refreshStatusAfterTransition() {
+        viewModelScope.launch {
+            delay(300)
+            checkStatus()
+        }
+    }
+
     fun updateSelectedLocation(lat: Double, lng: Double) {
         selectedLocation = selectedLocation.copy(latitude = lat, longitude = lng)
         _isApplied.value = false
         viewModelScope.launch {
             settingsStore.setLastLocation(lat, lng)
+        }
+    }
+
+    fun searchPlace(query: String) {
+        val trimmedQuery = query.trim()
+        if (trimmedQuery.isEmpty()) {
+            _messages.tryEmit(R.string.search_place_empty)
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = runCatching { searchPlaceOnNominatim(trimmedQuery) }
+            val location = result.getOrNull()
+
+            when {
+                location != null -> emitCameraLocation(location)
+                result.isFailure -> _messages.tryEmit(R.string.search_place_failed)
+                else -> _messages.tryEmit(R.string.search_place_not_found)
+            }
         }
     }
 
@@ -324,22 +356,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             val useFLP = settingsStore.useGooglePlayServices.first()
+            requestCurrentLocationForCamera(useFLP = useFLP)
+        }
+    }
 
-            // Recenter only from immediately available cached location to avoid
-            // late async updates snapping the camera back after the user pans away.
-            locateFromLastKnownLocation(
-                fusedLocationClient = if (useFLP) {
-                    LocationServices.getFusedLocationProviderClient(context)
-                } else {
-                    null
-                },
-                emitFailureMessage = false,
-                successMessageRes = null,
-                updateSelectedTarget = false,
-                updateAltitudeFromLocation = false,
-                resumeMockAfterLocate = false
-            )
-            if (!useFLP) {
+    @SuppressLint("MissingPermission")
+    private fun requestCurrentLocationForCamera(useFLP: Boolean) {
+        if (useFLP) {
+            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+            try {
+                fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                    .addOnSuccessListener { location ->
+                        if (location != null) {
+                            applyLocatedPosition(
+                                location,
+                                successMessageRes = null,
+                                updateSelectedTarget = false,
+                                updateAltitudeFromLocation = false
+                            )
+                        } else {
+                            applyBestLastKnownLocation(
+                                emitFailureMessage = true,
+                                successMessageRes = null,
+                                updateSelectedTarget = false,
+                                updateAltitudeFromLocation = false,
+                                resumeMockAfterLocate = false
+                            )
+                        }
+                    }
+                    .addOnFailureListener {
+                        applyBestLastKnownLocation(
+                            emitFailureMessage = true,
+                            successMessageRes = null,
+                            updateSelectedTarget = false,
+                            updateAltitudeFromLocation = false,
+                            resumeMockAfterLocate = false
+                        )
+                    }
+            } catch (_: SecurityException) {
                 applyBestLastKnownLocation(
                     emitFailureMessage = true,
                     successMessageRes = null,
@@ -348,6 +402,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     resumeMockAfterLocate = false
                 )
             }
+            return
+        }
+
+        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        try {
+            locationManager.getCurrentLocation(
+                LocationManager.GPS_PROVIDER,
+                null,
+                context.mainExecutor
+            ) { location ->
+                if (location != null) {
+                    applyLocatedPosition(
+                        location,
+                        successMessageRes = null,
+                        updateSelectedTarget = false,
+                        updateAltitudeFromLocation = false
+                    )
+                } else {
+                    applyBestLastKnownLocation(
+                        emitFailureMessage = true,
+                        successMessageRes = null,
+                        updateSelectedTarget = false,
+                        updateAltitudeFromLocation = false,
+                        resumeMockAfterLocate = false
+                    )
+                }
+            }
+        } catch (_: Exception) {
+            applyBestLastKnownLocation(
+                emitFailureMessage = true,
+                successMessageRes = null,
+                updateSelectedTarget = false,
+                updateAltitudeFromLocation = false,
+                resumeMockAfterLocate = false
+            )
         }
     }
 
@@ -447,6 +536,42 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun emitCameraLocation(location: Location) {
         _cameraLocations.tryEmit(location)
+    }
+
+    private fun searchPlaceOnNominatim(query: String): Location? {
+        val encodedQuery = URLEncoder.encode(query, Charsets.UTF_8.name())
+        val url = URL(
+            "https://nominatim.openstreetmap.org/search?q=$encodedQuery&format=jsonv2&limit=1"
+        )
+        val connection = (url.openConnection() as HttpURLConnection).apply {
+            connectTimeout = 10000
+            readTimeout = 10000
+            requestMethod = "GET"
+            setRequestProperty(
+                "User-Agent",
+                "${context.packageName}/1.0 (FxxkLocation)"
+            )
+            setRequestProperty("Accept", "application/json")
+            setRequestProperty("Accept-Language", "zh-TW,zh;q=0.9,en;q=0.8")
+        }
+
+        return try {
+            val response = connection.inputStream.bufferedReader().use { it.readText() }
+            val firstPlace = JSONArray(response).optJSONObject(0) ?: return null
+            val latitude = firstPlace.optString("lat").toDoubleOrNull() ?: return null
+            val longitude = firstPlace.optString("lon").toDoubleOrNull() ?: return null
+            Location("nominatim").apply {
+                this.latitude = latitude
+                this.longitude = longitude
+            }
+        } catch (e: Exception) {
+            if (e is IOException || e is SecurityException) {
+                throw e
+            }
+            throw IOException("Failed to search place", e)
+        } finally {
+            connection.disconnect()
+        }
     }
 
 
