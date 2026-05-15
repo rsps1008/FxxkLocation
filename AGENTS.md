@@ -82,6 +82,7 @@
 - 可設定 App 啟動時自動以最後位置恢復 mock。
 - 以常駐通知顯示執行中狀態與自動停止倒數。
 - App 會依系統語言自動套用語系；若系統語言為任何中文，會統一映射成繁體中文。設定頁不再提供中文／英文切換。
+- 系統語言同步要直接讀 `LocaleManagerCompat.getSystemLocales(context)`，不要讀 `context.resources.configuration.locales` 或只看 `LocaleList.getDefault()`；否則 App 先前套過的語系會把後續切換黏住，重開也不會跟著變。現在同步點放在 `MainActivity.attachBaseContext()`、`onCreate()` 和 `onResume()`。
 - `MainViewModel` 的 toast 訊息已改為字串資源，會跟著目前套用的語系同步切換。
 - 當正在虛擬定位時，主畫面右下角的 `Locate Me` 按鈕會以灰階樣式顯示；按下後仍會以目前系統回報的位置更新地圖。一旦停止虛擬定位，ViewModel 會立刻嘗試抓取真實定位與高度，並回寫到 camera / altitude 狀態。停止後再按 `Locate Me` 時，會主動向系統請求 current location，而不是只讀快取。
 - 當主畫面尚未啟動虛擬定位時，下方的 `X` 停止按鈕會維持灰階外觀，且點擊不會有反應；只有 mock 正在執行時才會真的停止。

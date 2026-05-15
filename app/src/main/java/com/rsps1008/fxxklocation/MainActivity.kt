@@ -1,5 +1,6 @@
 package com.rsps1008.fxxklocation
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -16,6 +17,11 @@ import com.rsps1008.fxxklocation.viewmodel.MainViewModel
 import com.rsps1008.fxxklocation.viewmodel.SettingsViewModel
 
 class MainActivity : AppCompatActivity() {
+    override fun attachBaseContext(newBase: Context) {
+        LanguageHelper.syncWithSystemLanguage(newBase)
+        super.attachBaseContext(newBase)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         LanguageHelper.syncWithSystemLanguage(this)
