@@ -10,10 +10,10 @@ android {
 
     defaultConfig {
         applicationId = "com.rsps1008.fxxklocation"
-        minSdk = 31
+        minSdk = 28
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 12
+        versionName = "1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

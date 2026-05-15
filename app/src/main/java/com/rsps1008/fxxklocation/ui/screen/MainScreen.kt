@@ -397,6 +397,12 @@ fun MainScreen(
                     Icon(Icons.Default.Close, stringResource(R.string.stop), modifier = Modifier.size(36.dp))
                 }
             }
+
+            Spacer(
+                modifier = Modifier
+                    .height(12.dp)
+                    .navigationBarsPadding()
+            )
         }
     }
 }

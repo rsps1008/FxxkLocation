@@ -85,6 +85,7 @@
 - `MainViewModel` 的 toast 訊息已改為字串資源，會跟著目前套用的語系同步切換。
 - 當正在虛擬定位時，主畫面右下角的 `Locate Me` 按鈕會以灰階樣式顯示；按下後仍會以目前系統回報的位置更新地圖。一旦停止虛擬定位，ViewModel 會立刻嘗試抓取真實定位與高度，並回寫到 camera / altitude 狀態。停止後再按 `Locate Me` 時，會主動向系統請求 current location，而不是只讀快取。
 - 當主畫面尚未啟動虛擬定位時，下方的 `X` 停止按鈕會維持灰階外觀，且點擊不會有反應；只有 mock 正在執行時才會真的停止。
+- 主畫面底部的勾勾／叉叉操作列保留額外底距與 navigation bar 安全區，避免在某些解析度下直接貼齊螢幕底部。
 - 主畫面現在另外會顯示一個藍色的 current location 標記，用來表示系統目前回報的位置；紅色標記則維持代表使用者選定的虛擬目標點。
 - 主畫面地圖不會再因為 `selectedLocation` 或 current location 更新而自動把鏡頭拉回去；鏡頭只會在使用者按 `Locate Me` 時主動 recenter。
 - 進入主畫面時，地圖會優先以最後一次記錄的 current location 作為初始鏡頭位置，沒有 current location 時才退回到 `selectedLocation`。
