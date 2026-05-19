@@ -158,7 +158,7 @@ fun SettingsScreen(
                         }
                         StatusItem(stringResource(R.string.gps_enabled), isGpsEnabled) { SystemCheckUtil.openLocationSettings(context) }
                         StatusItem(stringResource(R.string.mock_app_selected), isMockAppSet) { SystemCheckUtil.openDevelopmentSettings(context) }
-                        StatusItem(stringResource(R.string.ignore_battery_optimization), isIgnoringBatteryOptimizations) { SystemCheckUtil.openBatteryOptimizationSettings(context) }
+                        StatusItem(stringResource(R.string.ignore_battery_optimization), isIgnoringBatteryOptimizations) { SystemCheckUtil.requestBatteryOptimization(context) }
                     }
                 }
             }

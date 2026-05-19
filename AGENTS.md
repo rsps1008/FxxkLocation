@@ -81,6 +81,8 @@
 - 可設定自動停止時間。
 - 可設定 App 啟動時自動以最後位置恢復 mock。
 - 以常駐通知顯示執行中狀態與自動停止倒數。
+- 主畫面按下開始時，若缺位置／通知權限會依序走 OS runtime permission；接著會先走忽略電池最佳化的 OS request，最後才檢查 GPS / mock app 是否仍缺，並視結果決定是否跳出「需要權限」對話框。
+- 主畫面那個阻擋對話框目前文案已改成「需要完成系統設定」，內容會明確列出位置、通知、電池最佳化、GPS 與模擬應用程式等必要條件。
 - App 會依系統語言自動套用語系；若系統語言為任何中文，會統一映射成繁體中文。設定頁不再提供中文／英文切換。
 - 系統語言同步要直接讀 `LocaleManagerCompat.getSystemLocales(context)`，不要讀 `context.resources.configuration.locales` 或只看 `LocaleList.getDefault()`；否則 App 先前套過的語系會把後續切換黏住，重開也不會跟著變。現在同步點放在 `MainActivity.attachBaseContext()`、`onCreate()` 和 `onResume()`。
 - `MainViewModel` 的 toast 訊息已改為字串資源，會跟著目前套用的語系同步切換。
@@ -93,6 +95,7 @@
 - 當 mock 正在執行時，`MainViewModel` 會避免再去刷新真實 current location，以免把 current location 狀態覆寫回真實位置；此時 `Locate Me` 會優先使用已知的 mock/current 快照，而不是重新抓真實定位。
 - 設定頁提供快速跳轉到系統權限／開發者選項／電池最佳化頁面。
 - 目前可 runtime request 的權限包含位置與通知；這兩項會先走 Android runtime permission，只有在被 OS 拒絕後才跳 App 設定頁。電池最佳化與 mock app 指定屬於系統設定流程，不是 runtime permission，但也會優先走對應的 OS 頁面，再視情況回到 App 設定頁。
+- 主畫面開始模擬時，電池最佳化會先嘗試 `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` 的 OS request；返回 App 後會在 `onResume` 再檢查一次，若裝置不支援或使用者拒絕，才改導到設定頁，且只有在電池條件處理完後才會檢查 GPS / mock app。
 - 通知權限在 Android 13+ 會優先走 OS 層級的 runtime permission request；只有在使用者拒絕或無法直接請求時，才回到 App 設定頁當 fallback。
 - 主畫面按下開始後，若缺位置權限會先請求位置權限，接著再自動請求通知權限，不需要再按一次開始；若仍缺系統設定類條件，才會跳出「需要權限」對話框並導到設定頁，而不是直接打開 App OS 設定頁。
 - 權限頁面有時在剛回到 App 時會短暫維持舊狀態，因此 `checkStatus()` 會搭配一個短延遲的第二次刷新，避免剛調好權限卻仍顯示「修復」。

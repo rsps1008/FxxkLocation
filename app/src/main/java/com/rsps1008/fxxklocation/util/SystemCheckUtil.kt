@@ -146,6 +146,21 @@ object SystemCheckUtil {
         }
     }
 
+    fun createBatteryOptimizationRequestIntent(context: Context): Intent {
+        return Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+            data = Uri.parse("package:${context.packageName}")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    }
+
+    fun requestBatteryOptimization(context: Context) {
+        try {
+            context.startActivity(createBatteryOptimizationRequestIntent(context))
+        } catch (_: Exception) {
+            openBatteryOptimizationSettings(context)
+        }
+    }
+
     private fun isXiaomi(): Boolean {
         val brands = listOf("xiaomi", "redmi", "poco")
         val manufacturer = Build.MANUFACTURER.lowercase()

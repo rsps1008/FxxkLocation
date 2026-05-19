@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Fxxk Location</string>
-    <string name="permissions_required">需要权限</string>
-    <string name="permissions_message">若要开始模拟位置，请确保在设置页面中已正确配置所有系统权限。</string>
+    <string name="permissions_required">需要完成系统设置</string>
+    <string name="permissions_message">若要开始模拟位置，请先在设置页面完成位置、通知、电池优化、GPS 与模拟应用等必要系统设置。</string>
     <string name="go_to_settings">前往设置</string>
     <string name="cancel">取消</string>
     <string name="settings">设置</string>

@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">Fxxk Location</string>
-    <string name="permissions_required">Permissions Required</string>
-    <string name="permissions_message">To start mocking location, please ensure all system permissions and settings are correctly configured in the Settings page.</string>
+    <string name="permissions_required">System Setup Required</string>
+    <string name="permissions_message">To start mock location, please complete the required location, notification, battery optimization, GPS, and mock app settings in the Settings page.</string>
     <string name="go_to_settings">Go to Settings</string>
     <string name="cancel">Cancel</string>
     <string name="settings">Settings</string>

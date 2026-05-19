@@ -49,6 +49,8 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,8 +67,10 @@ fun MainScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val coroutineScope = rememberCoroutineScope()
     var showPermissionDialog by remember { mutableStateOf(false) }
     var pendingStartMock by remember { mutableStateOf(false) }
+    var awaitingBatteryOptimizationResponse by remember { mutableStateOf(false) }
     var hasInitializedInitialCamera by remember { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     val mapViewRef = remember { mutableStateOf<MapView?>(null) }
@@ -87,7 +91,8 @@ fun MainScreen(
                 onPendingStartMockChanged = { pendingStartMock = it },
                 showPermissionDialog = { showPermissionDialog = it },
                 locationPermissionLauncher = null,
-                notificationPermissionLauncher = null
+                notificationPermissionLauncher = null,
+                onBatteryOptimizationRequested = { awaitingBatteryOptimizationResponse = true }
             )
         } else {
             pendingStartMock = false
@@ -107,7 +112,8 @@ fun MainScreen(
                 onPendingStartMockChanged = { pendingStartMock = it },
                 showPermissionDialog = { showPermissionDialog = it },
                 locationPermissionLauncher = null,
-                notificationPermissionLauncher = notificationPermissionLauncher
+                notificationPermissionLauncher = notificationPermissionLauncher,
+                onBatteryOptimizationRequested = { awaitingBatteryOptimizationResponse = true }
             )
         } else {
             pendingStartMock = false
@@ -167,7 +173,25 @@ fun MainScreen(
                 Lifecycle.Event.ON_RESUME -> {
                     viewModel.checkStatus()
                     viewModel.refreshStatusAfterTransition()
+                    viewModel.refreshBatteryOptimizationStatusAfterTransition()
                     mapViewRef.value?.onResume()
+                    if (awaitingBatteryOptimizationResponse && pendingStartMock) {
+                        coroutineScope.launch {
+                            delay(1300)
+                            awaitingBatteryOptimizationResponse = false
+                            attemptStartMockFlow(
+                                context = context,
+                                viewModel = viewModel,
+                                pendingStartMock = pendingStartMock,
+                                onPendingStartMockChanged = { pendingStartMock = it },
+                                showPermissionDialog = { showPermissionDialog = it },
+                                locationPermissionLauncher = null,
+                                notificationPermissionLauncher = null,
+                                onBatteryOptimizationRequested = { awaitingBatteryOptimizationResponse = true },
+                                allowBatteryOptimizationRequest = false
+                            )
+                        }
+                    }
                 }
                 Lifecycle.Event.ON_PAUSE -> mapViewRef.value?.onPause()
                 Lifecycle.Event.ON_STOP -> mapViewRef.value?.onStop()
@@ -372,7 +396,8 @@ fun MainScreen(
                                 onPendingStartMockChanged = { pendingStartMock = it },
                                 showPermissionDialog = { showPermissionDialog = it },
                                 locationPermissionLauncher = locationPermissionLauncher,
-                                notificationPermissionLauncher = notificationPermissionLauncher
+                                notificationPermissionLauncher = notificationPermissionLauncher,
+                                onBatteryOptimizationRequested = { awaitingBatteryOptimizationResponse = true }
                             )
                         }
                     },
@@ -468,7 +493,9 @@ private fun attemptStartMockFlow(
     onPendingStartMockChanged: (Boolean) -> Unit,
     showPermissionDialog: (Boolean) -> Unit,
     locationPermissionLauncher: ActivityResultLauncher<String>?,
-    notificationPermissionLauncher: ActivityResultLauncher<String>?
+    notificationPermissionLauncher: ActivityResultLauncher<String>?,
+    onBatteryOptimizationRequested: () -> Unit,
+    allowBatteryOptimizationRequest: Boolean = true
 ) {
     if (!pendingStartMock) return
 
@@ -479,7 +506,16 @@ private fun attemptStartMockFlow(
         !SystemCheckUtil.hasNotificationPermission(context) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
             notificationPermissionLauncher?.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        !SystemCheckUtil.isGpsEnabled(context) || !SystemCheckUtil.isMockLocationEnabled(context) || !SystemCheckUtil.isIgnoringBatteryOptimizations(context) -> {
+        !SystemCheckUtil.isIgnoringBatteryOptimizations(context) -> {
+            if (allowBatteryOptimizationRequest) {
+                onBatteryOptimizationRequested()
+                SystemCheckUtil.requestBatteryOptimization(context)
+            } else {
+                onPendingStartMockChanged(false)
+                showPermissionDialog(true)
+            }
+        }
+        !SystemCheckUtil.isGpsEnabled(context) || !SystemCheckUtil.isMockLocationEnabled(context) -> {
             onPendingStartMockChanged(false)
             showPermissionDialog(true)
         }

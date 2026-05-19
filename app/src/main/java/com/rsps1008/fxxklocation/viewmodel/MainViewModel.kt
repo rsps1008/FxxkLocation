@@ -301,6 +301,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun refreshBatteryOptimizationStatusAfterTransition() {
+        viewModelScope.launch {
+            delay(1200)
+            _isIgnoringBatteryOptimizations.value = SystemCheckUtil.isIgnoringBatteryOptimizations(context)
+        }
+    }
+
     fun updateSelectedLocation(lat: Double, lng: Double) {
         selectedLocation = selectedLocation.copy(latitude = lat, longitude = lng)
         _isApplied.value = false
