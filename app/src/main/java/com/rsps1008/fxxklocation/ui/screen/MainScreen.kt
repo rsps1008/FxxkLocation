@@ -35,6 +35,7 @@ import android.graphics.Paint
 import android.widget.Toast
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.text.input.ImeAction
 import com.rsps1008.fxxklocation.R
 import com.rsps1008.fxxklocation.util.SystemCheckUtil
@@ -143,17 +144,11 @@ fun MainScreen(
         }
     }
 
-    LaunchedEffect(mapLibreMapRef.value, isMocking, currentLocation, selectedLoc.latitude, selectedLoc.longitude) {
+    LaunchedEffect(mapLibreMapRef.value, isMocking, selectedLoc.latitude, selectedLoc.longitude) {
         if (hasInitializedInitialCamera) return@LaunchedEffect
 
         val map = mapLibreMapRef.value ?: return@LaunchedEffect
-        val initialTarget = if (isMocking) {
-            LatLng(selectedLoc.latitude, selectedLoc.longitude)
-        } else {
-            currentLocation?.let {
-                LatLng(it.latitude, it.longitude)
-            } ?: LatLng(selectedLoc.latitude, selectedLoc.longitude)
-        }
+        val initialTarget = LatLng(selectedLoc.latitude, selectedLoc.longitude)
 
         map.animateCamera(
             CameraUpdateFactory.newCameraPosition(
@@ -278,9 +273,7 @@ fun MainScreen(
                                     map.uiSettings.isCompassEnabled = true
                                     map.uiSettings.isRotateGesturesEnabled = false
                                     map.setStyle(Style.Builder().fromJson(MAPLIBRE_RASTER_STYLE_JSON)) {
-                                        val point = currentLocation?.let {
-                                            LatLng(it.latitude, it.longitude)
-                                        } ?: LatLng(selectedLoc.latitude, selectedLoc.longitude)
+                                        val point = LatLng(selectedLoc.latitude, selectedLoc.longitude)
                                         map.cameraPosition = CameraPosition.Builder()
                                             .target(point)
                                             .zoom(15.0)
@@ -385,41 +378,56 @@ fun MainScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                LargeFloatingActionButton(
+                Button(
                     onClick = { 
-                        if (!isApplied) {
-                            pendingStartMock = true
-                            attemptStartMockFlow(
-                                context = context,
-                                viewModel = viewModel,
-                                pendingStartMock = pendingStartMock,
-                                onPendingStartMockChanged = { pendingStartMock = it },
-                                showPermissionDialog = { showPermissionDialog = it },
-                                locationPermissionLauncher = locationPermissionLauncher,
-                                notificationPermissionLauncher = notificationPermissionLauncher,
-                                onBatteryOptimizationRequested = { awaitingBatteryOptimizationResponse = true }
-                            )
-                        }
+                        pendingStartMock = true
+                        attemptStartMockFlow(
+                            context = context,
+                            viewModel = viewModel,
+                            pendingStartMock = pendingStartMock,
+                            onPendingStartMockChanged = { pendingStartMock = it },
+                            showPermissionDialog = { showPermissionDialog = it },
+                            locationPermissionLauncher = locationPermissionLauncher,
+                            notificationPermissionLauncher = notificationPermissionLauncher,
+                            onBatteryOptimizationRequested = { awaitingBatteryOptimizationResponse = true }
+                        )
                     },
-                    containerColor = if (isApplied) Color.LightGray else MaterialTheme.colorScheme.primaryContainer
+                    enabled = !isApplied,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isApplied) Color.LightGray else MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        disabledContainerColor = Color.LightGray,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    contentPadding = PaddingValues(0.dp),
+                    modifier = Modifier.size(width = 72.dp, height = 40.dp)
                 ) {
-                    Icon(Icons.Default.Check, stringResource(R.string.start), modifier = Modifier.size(36.dp))
+                    Icon(Icons.Default.Check, stringResource(R.string.start), modifier = Modifier.size(24.dp))
                 }
 
-                LargeFloatingActionButton(
+                Button(
                     onClick = { if (isMocking) viewModel.stopMock() },
-                    containerColor = if (isMocking) {
-                        MaterialTheme.colorScheme.errorContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    },
-                    contentColor = if (isMocking) {
-                        MaterialTheme.colorScheme.onErrorContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
+                    enabled = isMocking,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isMocking) {
+                            MaterialTheme.colorScheme.errorContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        },
+                        contentColor = if (isMocking) {
+                            MaterialTheme.colorScheme.onErrorContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    contentPadding = PaddingValues(0.dp),
+                    modifier = Modifier.size(width = 72.dp, height = 40.dp)
                 ) {
-                    Icon(Icons.Default.Close, stringResource(R.string.stop), modifier = Modifier.size(36.dp))
+                    Icon(Icons.Default.Close, stringResource(R.string.stop), modifier = Modifier.size(24.dp))
                 }
             }
 

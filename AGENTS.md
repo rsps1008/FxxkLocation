@@ -88,10 +88,10 @@
 - `MainViewModel` 的 toast 訊息已改為字串資源，會跟著目前套用的語系同步切換。
 - 當正在虛擬定位時，主畫面右下角的 `Locate Me` 按鈕會以灰階樣式顯示；按下後仍會以目前系統回報的位置更新地圖。一旦停止虛擬定位，ViewModel 會立刻嘗試抓取真實定位與高度，並回寫到 camera / altitude 狀態。停止後再按 `Locate Me` 時，會主動向系統請求 current location，而不是只讀快取。
 - 當主畫面尚未啟動虛擬定位時，下方的 `X` 停止按鈕會維持灰階外觀，且點擊不會有反應；只有 mock 正在執行時才會真的停止。
-- 主畫面底部的勾勾／叉叉操作列保留額外底距與 navigation bar 安全區，避免在某些解析度下直接貼齊螢幕底部。
+- 主畫面底部的勾勾／叉叉操作列保留額外底距與 navigation bar 安全區，按鈕本體改為長方形小按鈕，避免 `LargeFloatingActionButton` 造成圓形外觀，也避免在某些解析度下直接貼齊螢幕底部。
 - 主畫面現在另外會顯示一個藍色的 current location 標記，用來表示系統目前回報的位置；紅色標記則維持代表使用者選定的虛擬目標點。
 - 主畫面地圖不會再因為 `selectedLocation` 或 current location 更新而自動把鏡頭拉回去；鏡頭只會在使用者按 `Locate Me` 時主動 recenter。
-- 進入主畫面時，地圖會優先以最後一次記錄的 current location 作為初始鏡頭位置，沒有 current location 時才退回到 `selectedLocation`。
+- 進入主畫面時，地圖會固定先以 `selectedLocation` 作為初始鏡頭位置；若沒有手動釘選過位置，則會落在 `selectedLocation` 的預設值，也就是台北 101。`current location` 仍會保留為藍色標記，但不再主導初始鏡頭。
 - 當 mock 正在執行時，`MainViewModel` 會避免再去刷新真實 current location，以免把 current location 狀態覆寫回真實位置；此時 `Locate Me` 會優先使用已知的 mock/current 快照，而不是重新抓真實定位。
 - 設定頁提供快速跳轉到系統權限／開發者選項／電池最佳化頁面。
 - 目前可 runtime request 的權限包含位置與通知；這兩項會先走 Android runtime permission，只有在被 OS 拒絕後才跳 App 設定頁。電池最佳化與 mock app 指定屬於系統設定流程，不是 runtime permission，但也會優先走對應的 OS 頁面，再視情況回到 App 設定頁。
@@ -122,7 +122,7 @@
   - 下方停止按鈕在 mock 尚未啟動時會是灰階外觀且不會有反應；只有 mock 正在執行時才可停止。
   - 地圖上另外會顯示一個藍色 current location 標記，和紅色目標點分開顯示。
   - 地圖鏡頭不會因狀態更新自動回正，只有定位按鈕會主動 recenter。
-  - 進畫面時會先以最後記錄的 current location 當作初始鏡頭位置；若沒有 current location，才退回 `selectedLocation`。
+  - 進畫面時會固定以 `selectedLocation` 當作初始鏡頭位置；`current location` 只保留為藍色標記，不再主導第一次開圖的位置。
 
 - `app/src/main/java/com/rsps1008/fxxklocation/ui/screen/SettingsScreen.kt`
   - 管理漂移、海拔、Google 服務、自動停止、自動啟動等設定。
