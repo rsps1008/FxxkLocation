@@ -1,7 +1,9 @@
 package com.rsps1008.fxxklocation.ui.screen
 
 import android.Manifest
+import android.content.Intent
 import android.os.Build
+import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -331,6 +333,34 @@ fun SettingsScreen(
                     checked = useGooglePlayServices,
                     onCheckedChange = { viewModel.setUseGooglePlayServices(it) }
                 )
+            }
+
+            HorizontalDivider()
+
+            // 6. Privacy Policy
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = stringResource(R.string.privacy_policy),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = stringResource(R.string.privacy_policy_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(
+                    onClick = {
+                        val intent = Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("https://rsps1008.github.io/FxxkLocation/privacy-policy/")
+                        )
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.open_privacy_policy))
+                }
             }
         }
     }

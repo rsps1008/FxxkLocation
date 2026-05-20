@@ -39,6 +39,9 @@
     <string name="search_place_empty">Please enter a place name or address.</string>
     <string name="search_place_not_found">No matching place was found.</string>
     <string name="search_place_failed">Unable to search places right now.</string>
+    <string name="privacy_policy">Privacy Policy</string>
+    <string name="privacy_policy_desc">View how the app handles location, notification, and service data.</string>
+    <string name="open_privacy_policy">Open Privacy Policy</string>
     <string name="notification_title">Mock Location Running</string>
     <string name="notification_text">Mocking location updates&#8230;</string>
     <string name="notification_text_auto_stop">Mocking location (Auto-stop in %d mins)</string>

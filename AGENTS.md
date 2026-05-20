@@ -94,6 +94,7 @@
 - 進入主畫面時，地圖會固定先以 `selectedLocation` 作為初始鏡頭位置；若沒有手動釘選過位置，則會落在 `selectedLocation` 的預設值，也就是台北 101。`current location` 仍會保留為藍色標記，但不再主導初始鏡頭。
 - 當 mock 正在執行時，`MainViewModel` 會避免再去刷新真實 current location，以免把 current location 狀態覆寫回真實位置；此時 `Locate Me` 會優先使用已知的 mock/current 快照，而不是重新抓真實定位。
 - 設定頁提供快速跳轉到系統權限／開發者選項／電池最佳化頁面。
+- 設定頁最下方加入了隱私政策入口，會開啟 `https://rsps1008.github.io/FxxkLocation/privacy-policy/`。
 - 目前可 runtime request 的權限包含位置與通知；這兩項會先走 Android runtime permission，只有在被 OS 拒絕後才跳 App 設定頁。電池最佳化與 mock app 指定屬於系統設定流程，不是 runtime permission，但也會優先走對應的 OS 頁面，再視情況回到 App 設定頁。
 - 主畫面開始模擬時，電池最佳化會先嘗試 `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` 的 OS request；返回 App 後會在 `onResume` 再檢查一次，若裝置不支援或使用者拒絕，才改導到設定頁，且只有在電池條件處理完後才會檢查 GPS / mock app。
 - 通知權限在 Android 13+ 會優先走 OS 層級的 runtime permission request；只有在使用者拒絕或無法直接請求時，才回到 App 設定頁當 fallback。
