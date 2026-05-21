@@ -401,9 +401,9 @@ fun MainScreen(
                         disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                     ),
                     contentPadding = PaddingValues(0.dp),
-                    modifier = Modifier.size(width = 72.dp, height = 40.dp)
+                    modifier = Modifier.size(width = 126.dp, height = 56.dp)
                 ) {
-                    Icon(Icons.Default.Check, stringResource(R.string.start), modifier = Modifier.size(24.dp))
+                    Icon(Icons.Default.Check, stringResource(R.string.start), modifier = Modifier.size(28.dp))
                 }
 
                 Button(
@@ -425,9 +425,9 @@ fun MainScreen(
                         disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                     ),
                     contentPadding = PaddingValues(0.dp),
-                    modifier = Modifier.size(width = 72.dp, height = 40.dp)
+                    modifier = Modifier.size(width = 126.dp, height = 56.dp)
                 ) {
-                    Icon(Icons.Default.Close, stringResource(R.string.stop), modifier = Modifier.size(24.dp))
+                    Icon(Icons.Default.Close, stringResource(R.string.stop), modifier = Modifier.size(28.dp))
                 }
             }
 
