@@ -64,6 +64,7 @@ fun MainScreen(
     val isMocking by viewModel.isMocking.collectAsState()
     val isApplied by viewModel.isApplied.collectAsState()
     val currentLocation by viewModel.currentLocation.collectAsState()
+    val hasLoadedInitialSelectedLocation = viewModel.hasLoadedInitialSelectedLocation
     
     val lifecycleOwner = LocalLifecycleOwner.current
     val focusManager = LocalFocusManager.current
@@ -145,7 +146,7 @@ fun MainScreen(
     }
 
     LaunchedEffect(mapLibreMapRef.value, isMocking, selectedLoc.latitude, selectedLoc.longitude) {
-        if (hasInitializedInitialCamera) return@LaunchedEffect
+        if (hasInitializedInitialCamera || !hasLoadedInitialSelectedLocation) return@LaunchedEffect
 
         val map = mapLibreMapRef.value ?: return@LaunchedEffect
         val initialTarget = LatLng(selectedLoc.latitude, selectedLoc.longitude)
@@ -274,10 +275,6 @@ fun MainScreen(
                                     map.uiSettings.isRotateGesturesEnabled = false
                                     map.setStyle(Style.Builder().fromJson(MAPLIBRE_RASTER_STYLE_JSON)) {
                                         val point = LatLng(selectedLoc.latitude, selectedLoc.longitude)
-                                        map.cameraPosition = CameraPosition.Builder()
-                                            .target(point)
-                                            .zoom(15.0)
-                                            .build()
                                         markerRef.value = map.addMarker(
                                             MarkerOptions()
                                                 .position(point)

@@ -40,6 +40,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var selectedLocation by mutableStateOf(LocationData(25.0330, 121.5654)) // Default to Taipei 101
         private set
 
+    var hasLoadedInitialSelectedLocation by mutableStateOf(false)
+        private set
+
     private val _isMocking = MutableStateFlow(false)
     val isMocking = _isMocking.asStateFlow()
 
@@ -118,6 +121,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (lastLat != null && lastLng != null) {
                 selectedLocation = selectedLocation.copy(latitude = lastLat, longitude = lastLng)
             }
+            hasLoadedInitialSelectedLocation = true
 
             // If "use real altitude" is enabled, refresh it on start
             if (settingsStore.useRealAltitude.first()) {

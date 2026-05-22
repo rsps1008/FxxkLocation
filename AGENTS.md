@@ -76,6 +76,7 @@
 - 可點擊「Locate Me」取得目前真實位置並同步更新海拔。
 - 啟動前景服務持續送出 mock location。
 - 可設定隨機漫步漂移，每 2 秒沿著上一個位置附近小步移動，並維持在設定的漂移半徑內，同時更新微幅海拔變化。
+- 隨機漂移的更新節奏固定是每 2 秒一次；每次步長上限為 `max(radius * 0.18, 2m)`，實際步長再落在 `35% ~ 100%` 的上限區間內，因此若漂移半徑是預設 `10m`，每次大約走 `0.7m ~ 2m`，海拔則每次額外隨機漂移約 `±0.2m`。
 - 可選擇手動海拔或抓取真實海拔。
 - 可選擇是否使用 Google Play Services 取得真實位置。
 - 可設定自動停止時間。
@@ -92,6 +93,7 @@
 - 主畫面現在另外會顯示一個藍色的 current location 標記，用來表示系統目前回報的位置；紅色標記則維持代表使用者選定的虛擬目標點。
 - 主畫面地圖不會再因為 `selectedLocation` 或 current location 更新而自動把鏡頭拉回去；鏡頭只會在使用者按 `Locate Me` 時主動 recenter。
 - 進入主畫面時，地圖會固定先以 `selectedLocation` 作為初始鏡頭位置；若沒有手動釘選過位置，則會落在 `selectedLocation` 的預設值，也就是台北 101。`current location` 仍會保留為藍色標記，但不再主導初始鏡頭。
+- 初始鏡頭現在要等 `MainViewModel` 把儲存的最後釘選位置載入完成後才會套用，避免畫面先以 101 定位後又鎖住不回到真正的釘選點。
 - 當 mock 正在執行時，`MainViewModel` 會避免再去刷新真實 current location，以免把 current location 狀態覆寫回真實位置；此時 `Locate Me` 會優先使用已知的 mock/current 快照，而不是重新抓真實定位。
 - 設定頁提供快速跳轉到系統權限／開發者選項／電池最佳化頁面。
 - 設定頁最下方加入了隱私政策入口，會開啟 `https://rsps1008.github.io/FxxkLocation/privacy-policy/`。
@@ -145,6 +147,7 @@
   - 讀取最後定位。
   - 啟停 `MockLocationService`。
   - 處理自動啟動、定位自己、刷新真實海拔。
+  - 目前多了一個 `hasLoadedInitialSelectedLocation` 狀態，供 `MainScreen` 判斷初始鏡頭是否可以套用；這個狀態必須在讀完儲存的最後釘選點之後才會設為 `true`。
   - `centerMapOnCurrentLocation()` 在 mock 狀態下只使用目前已知的 mock/current 快照；非 mock 狀態下會主動請求 current location。整個流程都不會覆寫 `selectedLocation`，且只有定位失敗時才提示訊息。
   - 使用字串資源發送 toast 訊息，避免語言切換後還有硬編碼英文提示。
   - 當 mock 狀態從 `true` 切到 `false` 時，會自動啟動一輪真實定位查詢，優先 current location，失敗才 fallback 到 last known。
