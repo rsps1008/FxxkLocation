@@ -85,6 +85,7 @@
 - 主畫面按下開始時，若缺位置／通知權限會依序走 OS runtime permission；接著會先走忽略電池最佳化的 OS request，最後才檢查 GPS / mock app 是否仍缺，並視結果決定是否跳出「需要權限」對話框。
 - 主畫面那個阻擋對話框目前文案已改成「需要完成系統設定」，內容會明確列出位置、通知、電池最佳化、GPS 與模擬應用程式等必要條件。
 - App 會依系統語言自動套用語系；若系統語言為任何中文，會統一映射成繁體中文。設定頁不再提供中文／英文切換。
+- App 目前已補上日文與韓文字串資源；若系統語言為日文或韓文，會直接套用對應語系，其餘語言維持預設英文。
 - 系統語言同步要直接讀 `LocaleManagerCompat.getSystemLocales(context)`，不要讀 `context.resources.configuration.locales` 或只看 `LocaleList.getDefault()`；否則 App 先前套過的語系會把後續切換黏住，重開也不會跟著變。現在同步點放在 `MainActivity.attachBaseContext()`、`onCreate()` 和 `onResume()`。
 - `MainViewModel` 的 toast 訊息已改為字串資源，會跟著目前套用的語系同步切換。
 - 當正在虛擬定位時，主畫面右下角的 `Locate Me` 按鈕會以灰階樣式顯示；按下後仍會以目前系統回報的位置更新地圖。一旦停止虛擬定位，ViewModel 會立刻嘗試抓取真實定位與高度，並回寫到 camera / altitude 狀態。停止後再按 `Locate Me` 時，會主動向系統請求 current location，而不是只讀快取。
@@ -227,6 +228,7 @@
 9. 若 log 出現 `Unable to resolve host "tile.openstreetmap.org"`，代表目前執行裝置或模擬器的 DNS / 網路環境無法解析外部圖磚網域。這種情況下 MapLibre 會只顯示空白底圖，屬於環境連線問題，不是地圖選點邏輯本身失效。
 10. 主畫面的地標搜尋會依賴 `nominatim.openstreetmap.org`；如果該服務或網路不可用，搜尋只會失敗，不會影響既有 mock 流程。
 11. `docs/index.html` 與 `docs/privacy-policy/index.html` 屬於對外公開頁面，內容需要隨 App 實際功能同步更新，尤其是資料儲存、定位使用與第三方服務說明。
+12. 目前程式碼沒有看到付費、訂閱、廣告、遊戲或自有後端；因此使用者貼出的 Brazil / Japan / Korea 商家或付款類要求，多半只會在之後加入 IAP、付費版本或開發者帳戶條件符合時才會真正觸發。Vietnam 的網遊授權規定則與目前這個 mock location App 無直接關聯。
 
 ## 建議的後續維護方向
 
