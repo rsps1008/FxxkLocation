@@ -1,4 +1,4 @@
-# Fxxk Location
+# Fake Location
 # Fake GPS for Android
 
 A powerful and user-friendly Android application for mocking location with advanced simulation features.
@@ -10,7 +10,7 @@ A powerful and user-friendly Android application for mocking location with advan
 ## English
 
 ### Features
-- **Mock Location**: Easily set your device's location to any coordinates.
+- **Fake Location**: Easily set your device's location to any coordinates.
 - **Random Drift**: Simulates realistic human movement by slightly shifting location and altitude every 2 seconds.
 - **Altitude Support**: Choose between manual altitude input or fetching real altitude from your current location.
 - **Google Play Services Integration**: Option to use Fused Location Provider for more consistent location updates.
@@ -21,7 +21,7 @@ A powerful and user-friendly Android application for mocking location with advan
 
 ### Prerequisites
 1. **Enable Developer Options**: Go to Settings > About Phone > Tap "Build Number" 7 times.
-2. **Select Mock Location App**: In Developer Options, find "Select mock location app" and choose **Fxxk Location**.
+2. **Select mock location app**: In Developer Options, find "Select mock location app" and choose **Fake Location**.
 3. **Grant Permissions**: The app requires Location and Notification permissions to function correctly.
 4. **Battery Optimization**: It is recommended to exclude this app from battery optimization to prevent the service from being killed in the background.
 
@@ -41,6 +41,6 @@ A powerful and user-friendly Android application for mocking location with advan
 
 ### 使用前準備
 1. **開啟開發人員選項**：前往「設定」>「關於手機」> 連續點擊「版本號碼」7 次。
-2. **選取模擬位置應用程式**：在「開發人員選項」中，找到「選取模擬位置應用程式」並選擇 **Fxxk Location**。
+2. **選取模擬位置應用程式**：在「開發人員選項」中，找到「選取模擬位置應用程式」並選擇 **Fake Location**。
 3. **授予權限**：App 需要位置與通知權限才能正常運作。
 4. **電池最佳化**：建議將此 App 加入忽略電池最佳化清單，以防止服務在背景被系統中斷。

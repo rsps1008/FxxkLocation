@@ -560,7 +560,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             requestMethod = "GET"
             setRequestProperty(
                 "User-Agent",
-                "${context.packageName}/1.0 (FxxkLocation)"
+                "${context.packageName}/1.0 (Fake Location)"
             )
             setRequestProperty("Accept", "application/json")
             setRequestProperty("Accept-Language", "zh-TW,zh;q=0.9,en;q=0.8")

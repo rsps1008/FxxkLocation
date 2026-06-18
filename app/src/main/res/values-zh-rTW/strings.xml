@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Fxxk Location</string>
+    <string name="app_name">Fake Location</string>
     <string name="permissions_required">需要完成系統設定</string>
     <string name="permissions_message">若要開始模擬位置，請先在設定頁完成位置、通知、電池最佳化、GPS 與模擬應用程式等必要系統設定。</string>
     <string name="go_to_settings">前往設定</string>

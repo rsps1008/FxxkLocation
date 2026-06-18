@@ -93,7 +93,7 @@ object SystemCheckUtil {
             try {
                 val intent = Intent("com.miui.powerkeeper.setup.SET_BATTERY_MODE").apply {
                     putExtra("package_name", targetPackage)
-                    putExtra("package_label", "Fxxk Location")
+                    putExtra("package_label", "Fake Location")
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 context.startActivity(intent)
@@ -105,7 +105,7 @@ object SystemCheckUtil {
                 val intent = Intent().apply {
                     component = ComponentName("com.miui.powerkeeper", "com.miui.powerkeeper.ui.HiddenAppsConfigActivity")
                     putExtra("package_name", targetPackage)
-                    putExtra("package_label", "Fxxk Location")
+                    putExtra("package_label", "Fake Location")
                     putExtra("user_handle", android.os.Process.myUserHandle().hashCode())
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }

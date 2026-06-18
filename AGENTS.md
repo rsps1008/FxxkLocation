@@ -16,7 +16,7 @@
 
 ## 專案概覽
 
-- 專案名稱：`Fxxk Location`
+- 專案名稱：`Fake Location`
 - 類型：單模組 Android App
 - 目標：提供可持續運作的模擬定位功能，並支援較真實的漂移、海拔、自動停止與自動啟動等設定
 - 主要技術：
@@ -136,7 +136,7 @@
 
 - `docs/index.html`
   - GitHub Pages 風格的專案首頁。
-  - 目前內容用來介紹 FxxkLocation 的核心功能、使用前置條件與隱私政策入口。
+- 目前內容用來介紹 Fake Location 的核心功能、使用前置條件與隱私政策入口。
 - `docs/privacy-policy/index.html`
   - 對外公開的隱私權政策頁面。
   - 目前內容以「資料主要保存在裝置上、沒有自有後端」為主軸，並說明定位、通知與 Google Play Services 相關使用情境。
@@ -229,6 +229,7 @@
 10. 主畫面的地標搜尋會依賴 `nominatim.openstreetmap.org`；如果該服務或網路不可用，搜尋只會失敗，不會影響既有 mock 流程。
 11. `docs/index.html` 與 `docs/privacy-policy/index.html` 屬於對外公開頁面，內容需要隨 App 實際功能同步更新，尤其是資料儲存、定位使用與第三方服務說明。
 12. 目前程式碼沒有看到付費、訂閱、廣告、遊戲或自有後端；因此使用者貼出的 Brazil / Japan / Korea 商家或付款類要求，多半只會在之後加入 IAP、付費版本或開發者帳戶條件符合時才會真正觸發。Vietnam 的網遊授權規定則與目前這個 mock location App 無直接關聯。
+12. 近期已將對外品牌改為 `Fake Location`；若要送審或重新上架，請同步確認 app 名稱、網站標題、隱私權頁、截圖與任何商店 metadata 都沒有殘留不雅字樣。
 
 ## 建議的後續維護方向
 

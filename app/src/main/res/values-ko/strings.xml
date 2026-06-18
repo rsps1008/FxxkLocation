@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Fxxk Location</string>
+    <string name="app_name">Fake Location</string>
     <string name="permissions_required">시스템 설정이 필요합니다</string>
     <string name="permissions_message">모의 위치를 시작하려면 설정 화면에서 위치, 알림, 배터리 최적화, GPS, 모의 앱 항목을 완료해 주세요.</string>
     <string name="go_to_settings">설정으로 이동</string>

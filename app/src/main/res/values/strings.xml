@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Fxxk Location</string>
+    <string name="app_name">Fake Location</string>
     <string name="permissions_required">System Setup Required</string>
     <string name="permissions_message">To start mock location, please complete the required location, notification, battery optimization, GPS, and mock app settings in the Settings page.</string>
     <string name="go_to_settings">Go to Settings</string>
@@ -42,10 +42,10 @@
     <string name="privacy_policy">Privacy Policy</string>
     <string name="privacy_policy_desc">View how the app handles location, notification, and service data.</string>
     <string name="open_privacy_policy">Open Privacy Policy</string>
-    <string name="notification_title">Mock Location Running</string>
+    <string name="notification_title">Fake Location Running</string>
     <string name="notification_text">Mocking location updates&#8230;</string>
     <string name="notification_text_auto_stop">Mocking location (Auto-stop in %d mins)</string>
-    <string name="notification_channel_name">Mock Location Service</string>
+    <string name="notification_channel_name">Fake Location Service</string>
     <string name="current_location">Current Location</string>
     <string name="location_permission_required">Location permission is required.</string>
     <string name="enable_gps_first">Please enable GPS first.</string>

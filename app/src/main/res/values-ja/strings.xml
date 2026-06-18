@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Fxxk Location</string>
+    <string name="app_name">Fake Location</string>
     <string name="permissions_required">システム設定が必要です</string>
     <string name="permissions_message">モック位置を開始するには、設定画面で位置情報、通知、バッテリー最適化、GPS、モックアプリの各項目を完了してください。</string>
     <string name="go_to_settings">設定へ移動</string>
