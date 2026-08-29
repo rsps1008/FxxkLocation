@@ -7,18 +7,23 @@ import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -28,6 +33,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.rsps1008.fxxklocation.R
 import com.rsps1008.fxxklocation.util.SystemCheckUtil
 import com.rsps1008.fxxklocation.viewmodel.SettingsViewModel
+import kotlinx.coroutines.delay
+
+private const val SETTING_INPUT_COMMIT_DEBOUNCE_MILLIS = 450L
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,38 +78,24 @@ fun SettingsScreen(
         }
     }
 
-    var driftRadiusInput by remember { mutableStateOf("") }
-    var manualAltitudeInput by remember { mutableStateOf("") }
-    var autoStopMinutesInput by remember { mutableStateOf("") }
-    
-    // Sync string state with Double state if it changes from outside
-    LaunchedEffect(driftRadius) {
-        if (driftRadius.toString() != driftRadiusInput && driftRadius != driftRadiusInput.toDoubleOrNull()) {
-            driftRadiusInput = if (driftRadius % 1.0 == 0.0) {
-                driftRadius.toInt().toString()
-            } else {
-                driftRadius.toString()
-            }
-        }
-    }
-
-    // Sync manual altitude input
-    LaunchedEffect(lastAltitude) {
-        if (lastAltitude.toString() != manualAltitudeInput && lastAltitude != manualAltitudeInput.toDoubleOrNull()) {
-            manualAltitudeInput = if (lastAltitude % 1.0 == 0.0) {
-                lastAltitude.toInt().toString()
-            } else {
-                lastAltitude.toString()
-            }
-        }
-    }
-
-    // Sync auto stop minutes input
-    LaunchedEffect(autoStopMinutes) {
-        if (autoStopMinutes.toString() != autoStopMinutesInput) {
-            autoStopMinutesInput = autoStopMinutes.toString()
-        }
-    }
+    val driftRadiusInput = rememberDeferredSettingInput(
+        externalValue = driftRadius,
+        format = ::formatSettingDouble,
+        parse = String::toDoubleOrNull,
+        save = viewModel::setDriftRadius
+    )
+    val manualAltitudeInput = rememberDeferredSettingInput(
+        externalValue = lastAltitude,
+        format = ::formatSettingDouble,
+        parse = String::toDoubleOrNull,
+        save = viewModel::setManualAltitude
+    )
+    val autoStopMinutesInput = rememberDeferredSettingInput(
+        externalValue = autoStopMinutes,
+        format = Int::toString,
+        parse = String::toIntOrNull,
+        save = viewModel::setAutoStopMinutes
+    )
 
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -212,14 +206,33 @@ fun SettingsScreen(
 
                 if (enableAutoStop) {
                     OutlinedTextField(
-                        value = autoStopMinutesInput,
-                        onValueChange = {
-                            autoStopMinutesInput = it
-                            it.toIntOrNull()?.let { minutes -> viewModel.setAutoStopMinutes(minutes) }
-                        },
+                        value = autoStopMinutesInput.text,
+                        onValueChange = autoStopMinutesInput::onTextChanged,
                         label = { Text(stringResource(R.string.stop_after_minutes)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { focusState ->
+                                autoStopMinutesInput.onFocusChanged(
+                                    isFocusedNow = focusState.isFocused,
+                                    externalValue = autoStopMinutes,
+                                    format = Int::toString,
+                                    parse = String::toIntOrNull,
+                                    save = viewModel::setAutoStopMinutes
+                                )
+                            },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number,
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                autoStopMinutesInput.commit(
+                                    externalValue = autoStopMinutes,
+                                    parse = String::toIntOrNull,
+                                    save = viewModel::setAutoStopMinutes
+                                )
+                            }
+                        )
                     )
                 }
             }
@@ -251,13 +264,32 @@ fun SettingsScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(stringResource(R.string.drift_radius_meters), style = MaterialTheme.typography.titleSmall)
                         OutlinedTextField(
-                            value = driftRadiusInput,
-                            onValueChange = { 
-                                driftRadiusInput = it
-                                it.toDoubleOrNull()?.let { radius -> viewModel.setDriftRadius(radius) }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                            value = driftRadiusInput.text,
+                            onValueChange = driftRadiusInput::onTextChanged,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onFocusChanged { focusState ->
+                                    driftRadiusInput.onFocusChanged(
+                                        isFocusedNow = focusState.isFocused,
+                                        externalValue = driftRadius,
+                                        format = ::formatSettingDouble,
+                                        parse = String::toDoubleOrNull,
+                                        save = viewModel::setDriftRadius
+                                    )
+                                },
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Decimal,
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = {
+                                    driftRadiusInput.commit(
+                                        externalValue = driftRadius,
+                                        parse = String::toDoubleOrNull,
+                                        save = viewModel::setDriftRadius
+                                    )
+                                }
+                            )
                         )
                         Text(
                             stringResource(R.string.drift_radius_desc),
@@ -301,14 +333,33 @@ fun SettingsScreen(
 
                 if (!useRealAltitude) {
                     OutlinedTextField(
-                        value = manualAltitudeInput,
-                        onValueChange = {
-                            manualAltitudeInput = it
-                            it.toDoubleOrNull()?.let { alt -> viewModel.setManualAltitude(alt) }
-                        },
+                        value = manualAltitudeInput.text,
+                        onValueChange = manualAltitudeInput::onTextChanged,
                         label = { Text(stringResource(R.string.manual_altitude)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { focusState ->
+                                manualAltitudeInput.onFocusChanged(
+                                    isFocusedNow = focusState.isFocused,
+                                    externalValue = lastAltitude,
+                                    format = ::formatSettingDouble,
+                                    parse = String::toDoubleOrNull,
+                                    save = viewModel::setManualAltitude
+                                )
+                            },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal,
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                manualAltitudeInput.commit(
+                                    externalValue = lastAltitude,
+                                    parse = String::toDoubleOrNull,
+                                    save = viewModel::setManualAltitude
+                                )
+                            }
+                        )
                     )
                 }
             }
@@ -364,6 +415,126 @@ fun SettingsScreen(
             }
         }
     }
+}
+
+internal class DeferredSettingInput<T> {
+    var text by mutableStateOf("")
+        private set
+    private var isDirty by mutableStateOf(false)
+    private var isFocused by mutableStateOf(false)
+    private var pendingValue by mutableStateOf<T?>(null)
+
+    val hasPendingEdit: Boolean
+        get() = isDirty
+
+    fun onTextChanged(value: String) {
+        text = value
+        isDirty = true
+        pendingValue = null
+    }
+
+    fun restoreText(value: String, hasPendingEdit: Boolean) {
+        text = value
+        isDirty = hasPendingEdit
+        pendingValue = null
+    }
+
+    fun commit(
+        externalValue: T,
+        parse: (String) -> T?,
+        save: (T) -> Unit
+    ) {
+        if (!isDirty) return
+
+        val parsedValue = parse(text) ?: return
+        if (pendingValue == parsedValue) return
+
+        if (parsedValue == externalValue) {
+            pendingValue = null
+            isDirty = false
+        } else {
+            pendingValue = parsedValue
+            save(parsedValue)
+        }
+    }
+
+    fun onFocusChanged(
+        isFocusedNow: Boolean,
+        externalValue: T,
+        format: (T) -> String,
+        parse: (String) -> T?,
+        save: (T) -> Unit
+    ) {
+        if (isFocused && !isFocusedNow) {
+            if (isDirty) {
+                commit(externalValue, parse, save)
+            } else if (pendingValue == null) {
+                text = format(externalValue)
+            }
+        }
+        isFocused = isFocusedNow
+    }
+
+    fun syncFromExternal(externalValue: T, format: (T) -> String) {
+        val pending = pendingValue
+        if (pending != null && pending == externalValue) {
+            pendingValue = null
+            isDirty = false
+            return
+        }
+
+        if (!isFocused && !isDirty && pending == null) {
+            text = format(externalValue)
+        }
+    }
+}
+
+@Composable
+private fun <T> rememberDeferredSettingInput(
+    externalValue: T,
+    format: (T) -> String,
+    parse: (String) -> T?,
+    save: (T) -> Unit
+): DeferredSettingInput<T> {
+    val state = rememberSaveable(
+        saver = listSaver<DeferredSettingInput<T>, Any>(
+            save = { state -> listOf(state.text, state.hasPendingEdit) },
+            restore = { savedState ->
+                val savedText = savedState.firstOrNull() as? String ?: ""
+                val hasPendingEdit = savedState.getOrNull(1) as? Boolean ?: false
+                DeferredSettingInput<T>().also { it.restoreText(savedText, hasPendingEdit) }
+            }
+        )
+    ) {
+        DeferredSettingInput<T>()
+    }
+    val latestExternalValue by rememberUpdatedState(externalValue)
+    val latestParse by rememberUpdatedState(parse)
+    val latestSave by rememberUpdatedState(save)
+
+    LaunchedEffect(externalValue) {
+        state.syncFromExternal(externalValue, format)
+    }
+
+    LaunchedEffect(state.text) {
+        if (!state.hasPendingEdit) return@LaunchedEffect
+        delay(SETTING_INPUT_COMMIT_DEBOUNCE_MILLIS)
+        state.commit(latestExternalValue, latestParse, latestSave)
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            state.commit(latestExternalValue, latestParse, latestSave)
+        }
+    }
+
+    return state
+}
+
+private fun formatSettingDouble(value: Double): String = if (value % 1.0 == 0.0) {
+    value.toInt().toString()
+} else {
+    value.toString()
 }
 
 @Composable

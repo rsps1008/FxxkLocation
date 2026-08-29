@@ -135,6 +135,11 @@
 - `app/src/main/java/com/rsps1008/fxxklocation/ui/screen/SettingsScreen.kt`
   - 管理漂移、海拔、Google 服務、自動停止、自動啟動等設定。
   - 顯示系統狀態並提供修復入口。
+  - 漂移半徑、手動海拔與自動停止分鐘數使用各自獨立的本地文字草稿；只有失焦、IME Done、短暫 debounce 或畫面 dispose 時才提交可解析值，避免每次按鍵都寫入 DataStore。
+  - 輸入草稿使用 `rememberSaveable` 保存；DataStore 外部回讀在編輯或待確認寫入期間不會覆蓋文字，確認完成也保留使用者原本的暫時格式。
+
+- `app/src/test/java/com/rsps1008/fxxklocation/ui/screen/DeferredSettingInputTest.kt`
+  - 覆蓋暫時字串、外部值同步隔離、configuration restore 的 dirty 狀態，以及失焦提交去重。
 
 ### 對外網站文件
 
@@ -259,7 +264,7 @@
 1. `MockLocationService` 已改成每 2 秒維持 mock provider 與程序內即時位置同步；漂移設定以 Flow 觀察，DataStore 位置快照則節流為每 30 秒一次，並在停止時補寫最後值；相關狀態 Flow 也會略過相同值的重複通知。第 1 項 dispatcher 優化已完成：漂移計算使用 `Dispatchers.Default`，provider 操作使用序列化背景 dispatcher，並以 `Mutex`／`@Synchronized` 保護停止、重啟與銷毀順序。
 2. `MockLocationManager` 的 active provider 優化已完成：固定四個 provider 仍依原順序嘗試建立，但只有成功建立並啟用者會進入 `activeProviders`；更新只遍歷成功清單，停止清空，初始化失敗則記錄原因。
 3. `MainViewModel` 的自動啟動與最後位置載入是平行 coroutine，且以固定延遲等待；自動啟動檢查目前也未包含 GPS 狀態。後續可改成依明確初始化完成狀態啟動，並讓所有啟動入口共用完整前置條件檢查。
-4. 設定頁的漂移半徑、高度與自動停止分鐘數會在每次輸入變更時寫入 DataStore；後續可改為本地草稿值，通過格式／範圍驗證後於完成輸入或短暫 debounce 後提交。
+4. 設定頁數字輸入的 DataStore 寫入優化已完成：三個欄位各自維護可保存的本地草稿，通過原有解析規則後於失焦、IME Done、短暫 debounce 或 dispose 提交，並保留編輯中的暫時字串與外部回讀隔離。
 5. 位置查詢與套用邏輯在 `MainViewModel` 多處重複；停止模擬後的成功路徑已移除重複更新 current location 的寫入，但查詢與 fallback 流程仍可後續統一；`currentLocations` 已移除，部分 helper 仍應一併確認是否可移除。
 6. `MainScreen` 的 MapLibre `MapView` 生命週期同時由 `AndroidView` factory 與 `DisposableEffect` 管理，並且使用已棄用的 Marker Annotation API；後續可先統一生命週期所有權，再評估改用目前支援的 annotation／source API。
 7. 目前建置工具鏈為 AGP 9.3.2、Gradle 9.7.1、Kotlin 2.4.10；本次修改後 `testDebugUnitTest` 與 `assembleDebug` 成功，`lintDebug` 仍受專案既有 12 個 errors 與 26 個 warnings 阻擋。
