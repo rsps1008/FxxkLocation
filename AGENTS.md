@@ -207,6 +207,8 @@
   - 對多個 provider 寫入 mock location。
   - 可產生隨機漫步式漂移位置，並限制在指定半徑內。
   - `startMock()`、`stopMock()` 與 `updateMockLocation()` 以 `@Synchronized` 保護，讓背景 provider 操作與服務銷毀時的清理不會同時進入 LocationManager。
+  - `startMock()` 只有在 provider 成功建立並啟用後才加入 `activeProviders`；`updateMockLocation()` 只更新這些成功 provider，`stopMock()` 會清空清單，下一次啟動則重新逐一偵測。
+  - provider 初始化失敗會記錄一次警告並略過該 provider，不會在每次兩秒更新週期重複呼叫失敗的 provider。
 
 - `app/src/main/java/com/rsps1008/fxxklocation/util/SystemCheckUtil.kt`
   - 檢查定位／通知權限、GPS、mock app、電池最佳化狀態。
@@ -255,7 +257,7 @@
 以下是本次巡檢確認到的優化候選與目前實作狀態：
 
 1. `MockLocationService` 已改成每 2 秒維持 mock provider 與程序內即時位置同步；漂移設定以 Flow 觀察，DataStore 位置快照則節流為每 30 秒一次，並在停止時補寫最後值；相關狀態 Flow 也會略過相同值的重複通知。第 1 項 dispatcher 優化已完成：漂移計算使用 `Dispatchers.Default`，provider 操作使用序列化背景 dispatcher，並以 `Mutex`／`@Synchronized` 保護停止、重啟與銷毀順序。
-2. `MockLocationManager` 會對固定的四個 provider 逐一更新，即使某些裝置未成功建立 provider 也會每輪反覆進入例外處理；後續可只保留成功建立的 active providers，並保留失敗原因供診斷。
+2. `MockLocationManager` 的 active provider 優化已完成：固定四個 provider 仍依原順序嘗試建立，但只有成功建立並啟用者會進入 `activeProviders`；更新只遍歷成功清單，停止清空，初始化失敗則記錄原因。
 3. `MainViewModel` 的自動啟動與最後位置載入是平行 coroutine，且以固定延遲等待；自動啟動檢查目前也未包含 GPS 狀態。後續可改成依明確初始化完成狀態啟動，並讓所有啟動入口共用完整前置條件檢查。
 4. 設定頁的漂移半徑、高度與自動停止分鐘數會在每次輸入變更時寫入 DataStore；後續可改為本地草稿值，通過格式／範圍驗證後於完成輸入或短暫 debounce 後提交。
 5. 位置查詢與套用邏輯在 `MainViewModel` 多處重複；停止模擬後的成功路徑已移除重複更新 current location 的寫入，但查詢與 fallback 流程仍可後續統一；`currentLocations` 已移除，部分 helper 仍應一併確認是否可移除。

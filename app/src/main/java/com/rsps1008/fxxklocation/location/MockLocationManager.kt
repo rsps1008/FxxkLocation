@@ -5,6 +5,7 @@ import android.content.Context
 import android.location.Location
 import android.location.LocationManager
 import android.os.SystemClock
+import android.util.Log
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.rsps1008.fxxklocation.data.model.LocationData
@@ -13,6 +14,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
+@Suppress("LogNotTimber")
 class MockLocationManager(private val context: Context) {
     private val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     private val fusedLocationClient: FusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(context)
@@ -22,11 +24,18 @@ class MockLocationManager(private val context: Context) {
         LocationManager.PASSIVE_PROVIDER,
         "fused" // 許多 WebView 會直接使用融合定位來源
     )
+    private val activeProviders = mutableListOf<String>()
+
+    companion object {
+        private const val TAG = "MockLocationManager"
+    }
 
     @SuppressLint("MissingPermission")
     @Synchronized
     fun startMock() {
+        activeProviders.clear()
         providers.forEach { provider ->
+            var providerAdded = false
             try {
                 // 確保先移除舊的，重新建立乾淨的 Test Provider
                 try {
@@ -49,16 +58,27 @@ class MockLocationManager(private val context: Context) {
                     1,     // powerRequirement (POWER_LOW)
                     1      // accuracy (ACCURACY_FINE)
                 )
+                providerAdded = true
                 locationManager.setTestProviderEnabled(provider, true)
+                activeProviders += provider
             } catch (e: Exception) {
-                // 某些設備可能不支持 mock "fused"，忽略即可
+                Log.w(TAG, "Unable to initialize mock provider: $provider", e)
+                if (providerAdded) {
+                    try {
+                        locationManager.removeTestProvider(provider)
+                    } catch (_: Exception) {
+                        // Provider cleanup is best effort after an incomplete setup.
+                    }
+                }
             }
         }
     }
 
     @Synchronized
     fun stopMock() {
-        providers.forEach { provider ->
+        val providersToStop = activeProviders.toList()
+        activeProviders.clear()
+        providersToStop.forEach { provider ->
             try {
                 locationManager.removeTestProvider(provider)
             } catch (e: Exception) {
@@ -72,7 +92,7 @@ class MockLocationManager(private val context: Context) {
         val currentTime = System.currentTimeMillis()
         val elapsedNanos = SystemClock.elapsedRealtimeNanos()
 
-        providers.forEach { provider ->
+        activeProviders.forEach { provider ->
             val mockLocation = Location(provider).apply {
                 latitude = locationData.latitude
                 longitude = locationData.longitude
