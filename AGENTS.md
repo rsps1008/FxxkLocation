@@ -205,6 +205,7 @@
   - 停止時會以單一 DataStore transaction 同時保存最後位置並清除 `isMocking`，避免 ViewModel 提前寫入狀態造成競態。
   - 服務內的設定觀察採用 supervisor scope，各觀察支線會記錄例外而不直接留下未清理的 mock provider；停止寫入以 `stopSelfResult(startId)` 避免舊停止請求終止較新的啟動。
   - 服務控制與 UI/通知狀態仍在 `Dispatchers.Main`；漂移計算移到 `Dispatchers.Default`，所有 mock provider 的 start / stop / pause / resume / location update 則透過單一序列背景 dispatcher 與 `Mutex` 排隊，維持 provider 操作順序。
+  - 最後位置與 `isMocking=false` 的停止 transaction 使用獨立的 `stopScope`；一般工作 scope 取消時不會提前取消正在進行的停止持久化，停止工作完成後才允許銷毀流程取消該 scope。
   - `onDestroy()` 會先取消服務 scope，再以一次性的背景清理工作移除 provider；清理工作完成後會自行取消，避免在主執行緒執行 LocationManager IPC。
   - 內含自動停止倒數與通知更新邏輯。
 
@@ -265,11 +266,12 @@
 1. `MockLocationService` 已改成每 2 秒維持 mock provider 與程序內即時位置同步；漂移設定以 Flow 觀察，DataStore 位置快照則節流為每 30 秒一次，並在停止時補寫最後值；相關狀態 Flow 也會略過相同值的重複通知。第 1 項 dispatcher 優化已完成：漂移計算使用 `Dispatchers.Default`，provider 操作使用序列化背景 dispatcher，並以 `Mutex`／`@Synchronized` 保護停止、重啟與銷毀順序。
 2. `MockLocationManager` 的 active provider 優化已完成：固定四個 provider 仍依原順序嘗試建立，但只有成功建立並啟用者會進入 `activeProviders`；更新只遍歷成功清單，停止清空，初始化失敗則記錄原因。
 3. `MainViewModel` 的自動啟動 readiness 優化已完成：初始位置／高度載入與首次系統狀態檢查以 StateFlow 表示，移除固定延遲並處理失敗終止；自動啟動仍保留原本四個必要條件與不檢查 GPS 的既有行為，並以 DataStore／程序內狀態與 atomic claim 避免重複啟動。
-4. 設定頁數字輸入的 DataStore 寫入優化已完成：三個欄位各自維護可保存的本地草稿，通過原有解析規則後於失焦、IME Done、短暫 debounce 或 dispose 提交，並保留編輯中的暫時字串與外部回讀隔離。
-5. 位置查詢與套用邏輯在 `MainViewModel` 多處重複；停止模擬後的成功路徑已移除重複更新 current location 的寫入，但查詢與 fallback 流程仍可後續統一；`currentLocations` 已移除，部分 helper 仍應一併確認是否可移除。
-6. `MainScreen` 的 MapLibre `MapView` 生命週期同時由 `AndroidView` factory 與 `DisposableEffect` 管理，並且使用已棄用的 Marker Annotation API；後續可先統一生命週期所有權，再評估改用目前支援的 annotation／source API。
-7. 目前建置工具鏈為 AGP 9.3.2、Gradle 9.7.1、Kotlin 2.4.10；本次修改後 `testDebugUnitTest` 與 `assembleDebug` 成功，`lintDebug` 仍受專案既有 12 個 errors 與 26 個 warnings 阻擋。
-8. `minSdk` 目前文件與 `app/build.gradle.kts` 都應以 28 為準；lint 仍會因此指出既有 API 30／31 呼叫需要版本防護。
+4. `MockLocationService` 的 scope／停止生命週期優化已完成：一般工作 scope 可在 `onDestroy()` 取消，最後停止 transaction 使用獨立 `stopScope` 收尾後才取消；不使用 GlobalScope、runBlocking 或主執行緒等待。
+5. 設定頁數字輸入的 DataStore 寫入優化已完成：三個欄位各自維護可保存的本地草稿，通過原有解析規則後於失焦、IME Done、短暫 debounce 或 dispose 提交，並保留編輯中的暫時字串與外部回讀隔離。
+6. 位置查詢與套用邏輯在 `MainViewModel` 多處重複；停止模擬後的成功路徑已移除重複更新 current location 的寫入，但查詢與 fallback 流程仍可後續統一；`currentLocations` 已移除，部分 helper 仍應一併確認是否可移除。
+7. `MainScreen` 的 MapLibre `MapView` 生命週期同時由 `AndroidView` factory 與 `DisposableEffect` 管理，並且使用已棄用的 Marker Annotation API；後續可先統一生命週期所有權，再評估改用目前支援的 annotation／source API。
+8. 目前建置工具鏈為 AGP 9.3.2、Gradle 9.7.1、Kotlin 2.4.10；本次修改後 `testDebugUnitTest` 與 `assembleDebug` 成功，`lintDebug` 仍受專案既有 12 個 errors 與 26 個 warnings 阻擋。
+9. `minSdk` 目前文件與 `app/build.gradle.kts` 都應以 28 為準；lint 仍會因此指出既有 API 30／31 呼叫需要版本防護。
 
 ## 建議的後續維護方向
 

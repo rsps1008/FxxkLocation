@@ -38,6 +38,8 @@ import kotlinx.coroutines.withContext
 @Suppress("LogNotTimber")
 class MockLocationService : Service() {
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private val stopScopeJob = SupervisorJob()
+    private val stopScope = CoroutineScope(Dispatchers.Main + stopScopeJob)
     private val providerDispatcher = Dispatchers.IO.limitedParallelism(1)
     private val providerMutex = Mutex()
     private val cleanupScope = CoroutineScope(providerDispatcher + SupervisorJob())
@@ -234,7 +236,7 @@ class MockLocationService : Service() {
         MockLocationRuntimeState.clear()
         val finalLocation = latestMockLocation
         latestMockLocation = null
-        stopJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+        stopJob = stopScope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
                 providerMutex.withLock {
                     withContext(providerDispatcher) {
@@ -371,6 +373,14 @@ class MockLocationService : Service() {
         mockJob?.cancel()
         scope.cancel()
         MockLocationRuntimeState.clear()
+        val activeStopJob = stopJob
+        if (activeStopJob?.isActive == true) {
+            activeStopJob.invokeOnCompletion {
+                stopScopeJob.cancel()
+            }
+        } else {
+            stopScopeJob.cancel()
+        }
         cleanupScope.launch {
             try {
                 providerMutex.withLock {
