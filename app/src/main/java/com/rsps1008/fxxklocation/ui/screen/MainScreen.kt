@@ -1,11 +1,19 @@
 package com.rsps1008.fxxklocation.ui.screen
 
 import android.Manifest
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color as AndroidColor
+import android.graphics.Paint
 import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -18,41 +26,44 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.result.ActivityResultLauncher
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color as AndroidColor
-import android.graphics.Paint
-import android.widget.Toast
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.ui.text.input.ImeAction
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.rsps1008.fxxklocation.R
 import com.rsps1008.fxxklocation.util.SystemCheckUtil
 import com.rsps1008.fxxklocation.viewmodel.MainViewModel
-import org.maplibre.android.annotations.IconFactory
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.maplibre.android.MapLibre
-import org.maplibre.android.annotations.Marker
-import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import org.maplibre.android.style.layers.Property
+import org.maplibre.android.style.layers.PropertyFactory
+import org.maplibre.android.style.layers.SymbolLayer
+import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.geojson.Feature
+import org.maplibre.geojson.FeatureCollection
+import org.maplibre.geojson.Point
 import kotlin.math.roundToInt
+
+private const val TARGET_SOURCE_ID = "target-location-source"
+private const val TARGET_LAYER_ID = "target-location-layer"
+private const val TARGET_ICON_ID = "target-pin-icon"
+
+private const val CURRENT_SOURCE_ID = "current-location-source"
+private const val CURRENT_LAYER_ID = "current-location-layer"
+private const val CURRENT_ICON_ID = "current-location-icon"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,9 +88,9 @@ fun MainScreen(
     var searchQuery by rememberSaveable { mutableStateOf("") }
     val mapViewRef = remember { mutableStateOf<MapView?>(null) }
     val mapLibreMapRef = remember { mutableStateOf<MapLibreMap?>(null) }
-    val markerRef = remember { mutableStateOf<Marker?>(null) }
-    val currentMarkerRef = remember { mutableStateOf<Marker?>(null) }
-    val currentLocationIcon = remember(context) { createCurrentLocationIcon(context) }
+    val targetPinBitmap = remember(context) { createTargetPinBitmap(context) }
+    val currentLocationBitmap = remember(context) { createCurrentLocationBitmap(context) }
+
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -198,8 +209,6 @@ fun MainScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            markerRef.value = null
-            currentMarkerRef.value = null
             mapLibreMapRef.value = null
             mapViewRef.value?.onDestroy()
             mapViewRef.value = null
@@ -273,48 +282,66 @@ fun MainScreen(
                                     mapLibreMapRef.value = map
                                     map.uiSettings.isCompassEnabled = true
                                     map.uiSettings.isRotateGesturesEnabled = false
-                                    map.setStyle(Style.Builder().fromJson(MAPLIBRE_RASTER_STYLE_JSON)) {
-                                        val point = LatLng(selectedLoc.latitude, selectedLoc.longitude)
-                                        markerRef.value = map.addMarker(
-                                            MarkerOptions()
-                                                .position(point)
-                                                .title(context.getString(R.string.target_location))
-                                        )
-                                        currentLocation?.let { location ->
-                                            val currentPoint = LatLng(location.latitude, location.longitude)
-                                            currentMarkerRef.value = map.addMarker(
-                                                MarkerOptions()
-                                                    .position(currentPoint)
-                                                    .title(context.getString(R.string.current_location))
-                                                    .icon(currentLocationIcon)
+                                    map.setStyle(Style.Builder().fromJson(MAPLIBRE_RASTER_STYLE_JSON)) { style ->
+                                        style.addImage(TARGET_ICON_ID, targetPinBitmap)
+                                        style.addImage(CURRENT_ICON_ID, currentLocationBitmap)
+
+                                        val currentFeatureCollection = if (currentLocation != null) {
+                                            FeatureCollection.fromFeature(Feature.fromGeometry(Point.fromLngLat(currentLocation!!.longitude, currentLocation!!.latitude)))
+                                        } else {
+                                            FeatureCollection.fromFeatures(emptyArray<Feature>())
+                                        }
+                                        val currentSource = GeoJsonSource(CURRENT_SOURCE_ID, currentFeatureCollection)
+                                        style.addSource(currentSource)
+                                        val currentLayer = SymbolLayer(CURRENT_LAYER_ID, CURRENT_SOURCE_ID).apply {
+                                            setProperties(
+                                                PropertyFactory.iconImage(CURRENT_ICON_ID),
+                                                PropertyFactory.iconAnchor(Property.ICON_ANCHOR_CENTER),
+                                                PropertyFactory.iconAllowOverlap(true),
+                                                PropertyFactory.iconIgnorePlacement(true)
                                             )
                                         }
+                                        style.addLayer(currentLayer)
+
+                                        val targetFeature = Feature.fromGeometry(Point.fromLngLat(selectedLoc.longitude, selectedLoc.latitude))
+                                        val targetSource = GeoJsonSource(TARGET_SOURCE_ID, targetFeature)
+                                        style.addSource(targetSource)
+                                        val targetLayer = SymbolLayer(TARGET_LAYER_ID, TARGET_SOURCE_ID).apply {
+                                            setProperties(
+                                                PropertyFactory.iconImage(TARGET_ICON_ID),
+                                                PropertyFactory.iconAnchor(Property.ICON_ANCHOR_BOTTOM),
+                                                PropertyFactory.iconAllowOverlap(true),
+                                                PropertyFactory.iconIgnorePlacement(true)
+                                            )
+                                        }
+                                        style.addLayer(targetLayer)
                                     }
                                     map.addOnMapClickListener { point ->
                                         viewModel.updateSelectedLocation(point.latitude, point.longitude)
-                                        markerRef.value?.position = point
+                                        map.style?.let { style ->
+                                            style.getSourceAs<GeoJsonSource>(TARGET_SOURCE_ID)?.setGeoJson(
+                                                Feature.fromGeometry(Point.fromLngLat(point.longitude, point.latitude))
+                                            )
+                                        }
                                         true
                                     }
                                 }
                             }
                         },
                         update = {
-                            val point = LatLng(selectedLoc.latitude, selectedLoc.longitude)
-                            markerRef.value?.position = point
+                            val style = mapLibreMapRef.value?.style
+                            if (style != null && style.isFullyLoaded) {
+                                style.getSourceAs<GeoJsonSource>(TARGET_SOURCE_ID)?.setGeoJson(
+                                    Feature.fromGeometry(Point.fromLngLat(selectedLoc.longitude, selectedLoc.latitude))
+                                )
 
-                            currentLocation?.let { location ->
-                                val currentPoint = LatLng(location.latitude, location.longitude)
-                                val currentMarker = currentMarkerRef.value
-                                if (currentMarker == null) {
-                                    currentMarkerRef.value = mapLibreMapRef.value?.addMarker(
-                                        MarkerOptions()
-                                            .position(currentPoint)
-                                            .title(context.getString(R.string.current_location))
-                                            .icon(currentLocationIcon)
-                                    )
+                                val currentSource = style.getSourceAs<GeoJsonSource>(CURRENT_SOURCE_ID)
+                                val currentFeatureCollection = if (currentLocation != null) {
+                                    FeatureCollection.fromFeature(Feature.fromGeometry(Point.fromLngLat(currentLocation!!.longitude, currentLocation!!.latitude)))
                                 } else {
-                                    currentMarker.position = currentPoint
+                                    FeatureCollection.fromFeatures(emptyArray<Feature>())
                                 }
+                                currentSource?.setGeoJson(currentFeatureCollection)
                             }
                         },
                         modifier = Modifier.fillMaxSize()
@@ -463,7 +490,41 @@ private const val MAPLIBRE_RASTER_STYLE_JSON = """
 }
 """
 
-private fun createCurrentLocationIcon(context: android.content.Context): org.maplibre.android.annotations.Icon {
+private fun createTargetPinBitmap(context: android.content.Context): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val width = (30 * density).roundToInt().coerceAtLeast(1)
+    val height = (42 * density).roundToInt().coerceAtLeast(1)
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val radius = width / 2f
+    val pinPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.parseColor("#E53935")
+        style = Paint.Style.FILL
+    }
+    val innerDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.WHITE
+        style = Paint.Style.FILL
+    }
+    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.parseColor("#C62828")
+        style = Paint.Style.STROKE
+        strokeWidth = 1.2f * density
+    }
+
+    val path = android.graphics.Path().apply {
+        arcTo(0f, 0f, width.toFloat(), width.toFloat(), 180f, 180f, false)
+        lineTo(radius, height.toFloat())
+        close()
+    }
+    canvas.drawPath(path, pinPaint)
+    canvas.drawPath(path, strokePaint)
+    canvas.drawCircle(radius, radius, radius * 0.40f, innerDotPaint)
+
+    return bitmap
+}
+
+private fun createCurrentLocationBitmap(context: android.content.Context): Bitmap {
     val density = context.resources.displayMetrics.density
     val size = (24 * density).roundToInt().coerceAtLeast(1)
     val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
@@ -488,7 +549,7 @@ private fun createCurrentLocationIcon(context: android.content.Context): org.map
     }
     canvas.drawCircle(center, center, size * 0.18f, innerPaint)
 
-    return IconFactory.getInstance(context).fromBitmap(bitmap)
+    return bitmap
 }
 
 private fun attemptStartMockFlow(

@@ -29,7 +29,7 @@
 
 ### 地圖套件
 
-- 目前地圖使用 `org.maplibre.gl:android-sdk:12.3.1`
+- 目前地圖使用 `org.maplibre.gl:android-sdk:13.6.0`
 - 相依設定位置：
   - `app/build.gradle.kts`
   - `gradle/libs.versions.toml`
@@ -38,7 +38,7 @@
 - 目前使用方式：
   - 在 Compose `AndroidView` 中包裝 MapLibre 的 `MapView`
   - 目前改為內嵌的 MapLibre style JSON，底圖來源是 OpenStreetMap raster tiles：`https://tile.openstreetmap.org/{z}/{x}/{y}.png`
-  - 以 `Marker` 顯示目標位置
+  - 使用現代官方的 `GeoJsonSource` 與 `SymbolLayer` 渲染紅色目標圖釘與藍色當前位置標記（已完全移除已棄用的 Legacy Marker/Annotation API）。
   - 以地圖點擊事件更新選定座標
 
 ## 建置與執行
@@ -46,15 +46,15 @@
 ### 基本環境
 
 - `compileSdk = 37`
-- `targetSdk = 36`
-- `minSdk = 28`
-- Java / Kotlin JVM target：`11`
+- `targetSdk = 37`
+- `minSdk = 31`（Android 12；以新版 API 為最低支援門檻）
+- Java / Kotlin JVM target：`21`
 - Android Gradle Plugin：`9.3.2`
 - Kotlin：`2.4.10`
 - AGP 9 已內建 Kotlin；不要再套用 `org.jetbrains.kotlin.android`，Compose compiler plugin 仍由版本目錄管理。
-- AGP 9 下 Kotlin JVM 目標使用 `kotlin { compilerOptions { ... } }`，不再使用已移除的 `kotlinOptions` DSL。
+- AGP 9 下 Kotlin JVM 目標使用頂層的 `kotlin { compilerOptions { ... } }`（與 `android { }` 同級，勿置於 `android` 區塊內），不再使用已移除的 `kotlinOptions` DSL。
 - Compose 使用的 `LocalLifecycleOwner` 來自 `androidx.lifecycle:lifecycle-runtime-compose`；Material 返回圖示使用 AutoMirrored 版本。
-- MapLibre 13.6.0 的舊 annotations Marker API 目前仍被地圖標記流程使用，編譯時會產生 deprecated warnings，待改用新版 annotation/plugin API 時再一併調整。
+- 地圖標記已升級為現代 MapLibre `GeoJsonSource` + `SymbolLayer` 架構，且 AppOps 模擬位置檢查採用標準 `checkOpNoThrow`。目前未重新執行建置，編譯與 lint 結果仍待驗證。
 
 ### 常用指令
 
@@ -270,9 +270,9 @@
 4. `MockLocationService` 的 scope／停止生命週期優化已完成：一般工作 scope 可在 `onDestroy()` 取消，最後停止 transaction 使用獨立 `stopScope` 收尾後才取消；不使用 GlobalScope、runBlocking 或主執行緒等待。
 5. 設定頁數字輸入的 DataStore 寫入優化已完成：三個欄位各自維護可保存的本地草稿，通過原有解析規則後於失焦、IME Done、短暫 debounce 或 dispose 提交，並保留編輯中的暫時字串與外部回讀隔離。
 6. `MainViewModel` 的地點搜尋取消與最新結果優化已完成：新查詢會取消舊 Job，並以 request generation 在 Main 發布前驗證最新查詢；Nominatim 的 `HttpURLConnection` 會在 Job cancellation 時主動 disconnect，取消例外會重新拋出，原有 API、解析方式、camera 行為與提示文案維持不變。
-7. `MainScreen` 的 MapLibre `MapView` 生命週期同時由 `AndroidView` factory 與 `DisposableEffect` 管理，並且使用已棄用的 Marker Annotation API；後續可先統一生命週期所有權，再評估改用目前支援的 annotation／source API。
-8. 目前建置工具鏈為 AGP 9.3.2、Gradle 9.7.1、Kotlin 2.4.10；本次修改後 `testDebugUnitTest` 與 `assembleDebug` 成功，`lintDebug` 仍受專案既有 12 個 errors 與 26 個 warnings 阻擋。
-9. `minSdk` 目前文件與 `app/build.gradle.kts` 都應以 28 為準；lint 仍會因此指出既有 API 30／31 呼叫需要版本防護。
+7. `MainScreen` 的 MapLibre `MapView` 生命週期同時由 `AndroidView` factory 與 `DisposableEffect` 管理；地圖標記已使用 `GeoJsonSource` 與 `SymbolLayer`，不再依賴已棄用的 Legacy Marker/Annotation API。後續可先統一生命週期所有權。
+8. 目前建置工具鏈為 AGP 9.3.2、Gradle 9.7.1、Kotlin 2.4.10；調整為 `minSdk 31`、`targetSdk 37` 與 Java/Kotlin JVM target 21 後，尚待重新執行 `testDebugUnitTest`、`assembleDebug` 與 `lintDebug` 驗證。
+9. `minSdk` 目前文件與 `app/build.gradle.kts` 都應以 31 為準，因此 Android 12 以下裝置不在支援範圍；原先因 minSdk 28 而出現的 API 30／31 版本防護 lint 項目不再適用。
 
 ## 建議的後續維護方向
 

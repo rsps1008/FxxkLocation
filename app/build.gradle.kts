@@ -9,8 +9,8 @@ android {
 
     defaultConfig {
         applicationId = "com.rsps1008.fxxklocation"
-        minSdk = 28
-        targetSdk = 36
+        minSdk = 31
+        targetSdk = 37
         versionCode = 18
         versionName = "1.8"
 
@@ -27,16 +27,17 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-    kotlin {
-        compilerOptions {
-            jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11
-        }
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
     buildFeatures {
         compose = true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
     }
 }
 

@@ -41,20 +41,11 @@ object SystemCheckUtil {
     fun isMockLocationEnabled(context: Context): Boolean {
         return try {
             val appOpsManager = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-            val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                appOpsManager.unsafeCheckOpNoThrow(
-                    AppOpsManager.OPSTR_MOCK_LOCATION,
-                    android.os.Process.myUid(),
-                    context.packageName
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                appOpsManager.checkOpNoThrow(
-                    AppOpsManager.OPSTR_MOCK_LOCATION,
-                    android.os.Process.myUid(),
-                    context.packageName
-                )
-            }
+            val mode = appOpsManager.checkOpNoThrow(
+                AppOpsManager.OPSTR_MOCK_LOCATION,
+                android.os.Process.myUid(),
+                context.packageName
+            )
             mode == AppOpsManager.MODE_ALLOWED
         } catch (e: Exception) {
             false
