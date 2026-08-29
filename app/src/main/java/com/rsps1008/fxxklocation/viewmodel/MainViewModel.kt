@@ -20,8 +20,11 @@ import com.rsps1008.fxxklocation.data.state.MockLocationRuntimeState
 import com.rsps1008.fxxklocation.data.store.SettingsStore
 import com.rsps1008.fxxklocation.service.MockLocationService
 import com.rsps1008.fxxklocation.util.SystemCheckUtil
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -29,12 +32,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
@@ -87,6 +93,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _currentLocation = MutableStateFlow<LocationData?>(null)
     val currentLocation = _currentLocation.asStateFlow()
+    private var searchJob: Job? = null
+    private val searchGeneration = AtomicLong(0L)
 
     init {
         checkStatus()
@@ -377,19 +385,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun searchPlace(query: String) {
+        searchJob?.cancel()
+        searchJob = null
+        val generation = searchGeneration.incrementAndGet()
         val trimmedQuery = query.trim()
         if (trimmedQuery.isEmpty()) {
             _messages.tryEmit(R.string.search_place_empty)
             return
         }
 
-        viewModelScope.launch(Dispatchers.IO) {
-            val result = runCatching { searchPlaceOnNominatim(trimmedQuery) }
-            val location = result.getOrNull()
+        searchJob = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                ensureActive()
+                val location = searchPlaceOnNominatim(trimmedQuery)
+                ensureActive()
+                publishSearchResultIfLatest(generation, location, failed = false)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ensureActive()
+                publishSearchResultIfLatest(generation, location = null, failed = true)
+            }
+        }
+    }
+
+    private suspend fun publishSearchResultIfLatest(
+        generation: Long,
+        location: Location?,
+        failed: Boolean
+    ) {
+        withContext(Dispatchers.Main.immediate) {
+            if (generation != searchGeneration.get()) return@withContext
 
             when {
                 location != null -> emitCameraLocation(location)
-                result.isFailure -> _messages.tryEmit(R.string.search_place_failed)
+                failed -> _messages.tryEmit(R.string.search_place_failed)
                 else -> _messages.tryEmit(R.string.search_place_not_found)
             }
         }
@@ -609,7 +639,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _cameraLocations.tryEmit(location)
     }
 
-    private fun searchPlaceOnNominatim(query: String): Location? {
+    private suspend fun searchPlaceOnNominatim(query: String): Location? {
         val encodedQuery = URLEncoder.encode(query, Charsets.UTF_8.name())
         val url = URL(
             "https://nominatim.openstreetmap.org/search?q=$encodedQuery&format=jsonv2&limit=1"
@@ -625,9 +655,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             setRequestProperty("Accept", "application/json")
             setRequestProperty("Accept-Language", "zh-TW,zh;q=0.9,en;q=0.8")
         }
-
         return try {
-            val response = connection.inputStream.bufferedReader().use { it.readText() }
+            val response = readCancellableHttpResponse(connection)
             val firstPlace = JSONArray(response).optJSONObject(0) ?: return null
             val latitude = firstPlace.optString("lat").toDoubleOrNull() ?: return null
             val longitude = firstPlace.optString("lon").toDoubleOrNull() ?: return null
@@ -636,12 +665,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 this.longitude = longitude
             }
         } catch (e: Exception) {
-            if (e is IOException || e is SecurityException) {
+            if (e is CancellationException || e is IOException || e is SecurityException) {
                 throw e
             }
             throw IOException("Failed to search place", e)
-        } finally {
-            connection.disconnect()
         }
     }
 
@@ -750,6 +777,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             }
+        }
+    }
+}
+
+internal suspend fun readCancellableHttpResponse(connection: HttpURLConnection): String {
+    return suspendCancellableCoroutine { continuation ->
+        continuation.invokeOnCancellation { connection.disconnect() }
+        try {
+            val response = connection.inputStream.bufferedReader().use { it.readText() }
+            if (continuation.isActive) {
+                continuation.resume(response) { _, _, _ -> }
+            }
+        } catch (e: Exception) {
+            if (continuation.isActive) continuation.resumeWith(Result.failure(e))
+        } finally {
+            connection.disconnect()
         }
     }
 }

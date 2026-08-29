@@ -163,6 +163,7 @@
   - 使用字串資源發送 toast 訊息，避免語言切換後還有硬編碼英文提示。
   - 當 mock 狀態從 `true` 切到 `false` 時，會自動啟動一輪真實定位查詢，優先 current location，失敗才 fallback 到 last known。
   - 若程序內仍有 mock 即時位置，會忽略已排隊但較晚回來的真實定位回呼，避免覆寫 mock UI 狀態、camera 或 DataStore 快照。
+  - `searchPlace()` 會持有目前的搜尋 Job；新查詢會取消舊查詢，並在回到 Main 發布 camera／提示前核對 request generation，避免較慢的 Nominatim 回應覆蓋較新的查詢；`HttpURLConnection` 會註冊 Job cancellation handler 主動 `disconnect()`，`CancellationException` 也會維持取消語意，不會被轉成失敗提示。
 
 - `app/src/main/java/com/rsps1008/fxxklocation/viewmodel/SettingsViewModel.kt`
   - 將 `SettingsStore` 中的設定轉成 UI 可觀察狀態。
@@ -268,7 +269,7 @@
 3. `MainViewModel` 的自動啟動 readiness 優化已完成：初始位置／高度載入與首次系統狀態檢查以 StateFlow 表示，移除固定延遲並處理失敗終止；自動啟動仍保留原本四個必要條件與不檢查 GPS 的既有行為，並以 DataStore／程序內狀態與 atomic claim 避免重複啟動。
 4. `MockLocationService` 的 scope／停止生命週期優化已完成：一般工作 scope 可在 `onDestroy()` 取消，最後停止 transaction 使用獨立 `stopScope` 收尾後才取消；不使用 GlobalScope、runBlocking 或主執行緒等待。
 5. 設定頁數字輸入的 DataStore 寫入優化已完成：三個欄位各自維護可保存的本地草稿，通過原有解析規則後於失焦、IME Done、短暫 debounce 或 dispose 提交，並保留編輯中的暫時字串與外部回讀隔離。
-6. 位置查詢與套用邏輯在 `MainViewModel` 多處重複；停止模擬後的成功路徑已移除重複更新 current location 的寫入，但查詢與 fallback 流程仍可後續統一；`currentLocations` 已移除，部分 helper 仍應一併確認是否可移除。
+6. `MainViewModel` 的地點搜尋取消與最新結果優化已完成：新查詢會取消舊 Job，並以 request generation 在 Main 發布前驗證最新查詢；Nominatim 的 `HttpURLConnection` 會在 Job cancellation 時主動 disconnect，取消例外會重新拋出，原有 API、解析方式、camera 行為與提示文案維持不變。
 7. `MainScreen` 的 MapLibre `MapView` 生命週期同時由 `AndroidView` factory 與 `DisposableEffect` 管理，並且使用已棄用的 Marker Annotation API；後續可先統一生命週期所有權，再評估改用目前支援的 annotation／source API。
 8. 目前建置工具鏈為 AGP 9.3.2、Gradle 9.7.1、Kotlin 2.4.10；本次修改後 `testDebugUnitTest` 與 `assembleDebug` 成功，`lintDebug` 仍受專案既有 12 個 errors 與 26 個 warnings 阻擋。
 9. `minSdk` 目前文件與 `app/build.gradle.kts` 都應以 28 為準；lint 仍會因此指出既有 API 30／31 呼叫需要版本防護。
