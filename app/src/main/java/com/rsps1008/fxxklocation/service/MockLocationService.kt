@@ -19,6 +19,7 @@ import com.rsps1008.fxxklocation.data.store.CurrentLocationSnapshotPolicy
 import com.rsps1008.fxxklocation.data.store.SettingsStore
 import com.rsps1008.fxxklocation.location.MockLocationManager
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -30,10 +31,16 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 @Suppress("LogNotTimber")
 class MockLocationService : Service() {
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private val providerDispatcher = Dispatchers.IO.limitedParallelism(1)
+    private val providerMutex = Mutex()
+    private val cleanupScope = CoroutineScope(providerDispatcher + SupervisorJob())
     private lateinit var mockLocationManager: MockLocationManager
     private lateinit var settingsStore: SettingsStore
     private var mockJob: Job? = null
@@ -93,10 +100,14 @@ class MockLocationService : Service() {
                 startMocking(LocationData(lat, lng, alt))
             }
             ACTION_PAUSE_MOCK -> {
-                mockLocationManager.stopMock()
+                enqueueProviderOperation("pause") {
+                    mockLocationManager.stopMock()
+                }
             }
             ACTION_RESUME_MOCK -> {
-                mockLocationManager.startMock()
+                enqueueProviderOperation("resume") {
+                    mockLocationManager.startMock()
+                }
             }
         }
         return START_STICKY
@@ -112,18 +123,18 @@ class MockLocationService : Service() {
             DriftConfig(enabled, radius)
         }.distinctUntilChanged()
 
-        stopJob?.cancel()
-        stopJob = null
         mockJob?.cancel()
         stopRequested = false
         MockLocationRuntimeState.clearStopRequest()
         snapshotPolicy.reset()
         latestMockLocation = initialCenter
         MockLocationRuntimeState.update(initialCenter)
-        mockLocationManager.startMock()
 
-        mockJob = scope.launch {
+        mockJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
+                runProviderOperation {
+                    mockLocationManager.startMock()
+                }
                 var driftConfig = driftConfigFlow.first()
 
                 settingsStore.setIsMocking(true)
@@ -180,17 +191,29 @@ class MockLocationService : Service() {
                     }
 
                     while (true) {
-                        val locationToMock = if (driftConfig.enabled) {
-                            mockLocationManager.generateRandomWalkLocation(center, currentPosition, driftConfig.radius)
+                        val anchor = center
+                        val previous = currentPosition
+                        val enabled = driftConfig.enabled
+                        val radius = driftConfig.radius
+                        val calculatedLocation = if (enabled) {
+                            withContext(Dispatchers.Default) {
+                                mockLocationManager.generateRandomWalkLocation(anchor, previous, radius)
+                            }
                         } else {
-                            center
+                            anchor
                         }
+                        // The altitude collector can run while the Default/IO work is
+                        // suspended. Keep a newer altitude from being overwritten by
+                        // a stale calculation result.
+                        val locationToMock = calculatedLocation.copy(altitude = currentPosition.altitude)
 
                         currentPosition = locationToMock
                         latestMockLocation = locationToMock
                         MockLocationRuntimeState.update(locationToMock)
-                        mockLocationManager.updateMockLocation(locationToMock)
-                        persistCurrentLocationIfDue(locationToMock)
+                        runProviderOperation {
+                            mockLocationManager.updateMockLocation(locationToMock)
+                        }
+                        persistCurrentLocationIfDue(latestMockLocation ?: locationToMock)
                         delay(2000)
                     }
                 }
@@ -207,18 +230,35 @@ class MockLocationService : Service() {
         if (stopRequested) return
         stopRequested = true
         mockJob?.cancel()
-        mockLocationManager.stopMock()
         MockLocationRuntimeState.requestStop()
         MockLocationRuntimeState.clear()
         val finalLocation = latestMockLocation
         latestMockLocation = null
-        stopJob = scope.launch {
+        stopJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
-                settingsStore.setCurrentLocationAndStopMocking(finalLocation)
+                providerMutex.withLock {
+                    withContext(providerDispatcher) {
+                        mockLocationManager.stopMock()
+                    }
+                    try {
+                        settingsStore.setCurrentLocationAndStopMocking(finalLocation)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to persist the final mock location", e)
+                        try {
+                            settingsStore.setIsMocking(false)
+                        } catch (fallbackError: CancellationException) {
+                            throw fallbackError
+                        } catch (fallbackError: Exception) {
+                            Log.e(TAG, "Failed to clear the mocking state after persistence failure", fallbackError)
+                        }
+                    }
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to persist the final mock location", e)
+                Log.e(TAG, "Failed to stop the mock location provider", e)
                 try {
                     settingsStore.setIsMocking(false)
                 } catch (fallbackError: CancellationException) {
@@ -246,6 +286,26 @@ class MockLocationService : Service() {
         // Throttle failed attempts too, so a persistent DataStore error does
         // not turn the two-second mock loop into repeated I/O and logging.
         snapshotPolicy.markAttempted(now)
+    }
+
+    private fun enqueueProviderOperation(name: String, operation: () -> Unit) {
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            try {
+                runProviderOperation(operation)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Provider operation failed: $name", e)
+            }
+        }
+    }
+
+    private suspend fun runProviderOperation(operation: () -> Unit) {
+        providerMutex.withLock {
+            withContext(providerDispatcher) {
+                operation()
+            }
+        }
     }
 
     private fun createNotification(remainingMinutes: Int? = null): Notification {
@@ -309,9 +369,21 @@ class MockLocationService : Service() {
 
     override fun onDestroy() {
         mockJob?.cancel()
-        mockLocationManager.stopMock()
-        MockLocationRuntimeState.clear()
         scope.cancel()
+        MockLocationRuntimeState.clear()
+        cleanupScope.launch {
+            try {
+                providerMutex.withLock {
+                    mockLocationManager.stopMock()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Provider cleanup failed while destroying service", e)
+            } finally {
+                cleanupScope.cancel()
+            }
+        }
         super.onDestroy()
     }
 

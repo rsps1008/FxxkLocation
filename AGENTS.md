@@ -198,12 +198,15 @@
   - mock provider 仍每 2 秒更新；目前位置會先透過 `MockLocationRuntimeState` 在程序內即時同步給主畫面，再以 DataStore 初次、每 30 秒一次及停止時最後一次的節奏保存快照。
   - 停止時會以單一 DataStore transaction 同時保存最後位置並清除 `isMocking`，避免 ViewModel 提前寫入狀態造成競態。
   - 服務內的設定觀察採用 supervisor scope，各觀察支線會記錄例外而不直接留下未清理的 mock provider；停止寫入以 `stopSelfResult(startId)` 避免舊停止請求終止較新的啟動。
+  - 服務控制與 UI/通知狀態仍在 `Dispatchers.Main`；漂移計算移到 `Dispatchers.Default`，所有 mock provider 的 start / stop / pause / resume / location update 則透過單一序列背景 dispatcher 與 `Mutex` 排隊，維持 provider 操作順序。
+  - `onDestroy()` 會先取消服務 scope，再以一次性的背景清理工作移除 provider；清理工作完成後會自行取消，避免在主執行緒執行 LocationManager IPC。
   - 內含自動停止倒數與通知更新邏輯。
 
 - `app/src/main/java/com/rsps1008/fxxklocation/location/MockLocationManager.kt`
   - 建立與移除 test providers。
   - 對多個 provider 寫入 mock location。
   - 可產生隨機漫步式漂移位置，並限制在指定半徑內。
+  - `startMock()`、`stopMock()` 與 `updateMockLocation()` 以 `@Synchronized` 保護，讓背景 provider 操作與服務銷毀時的清理不會同時進入 LocationManager。
 
 - `app/src/main/java/com/rsps1008/fxxklocation/util/SystemCheckUtil.kt`
   - 檢查定位／通知權限、GPS、mock app、電池最佳化狀態。
@@ -236,7 +239,7 @@
 1. `README.md` 的繁體中文段落目前顯示亂碼，推測是檔案編碼有問題。
 2. `app/src/main/res/values-zh-rTW/strings.xml` 目前內容也有明顯亂碼，且看起來 XML 本身可能已損壞，後續若要正式支援繁中顯示，建議優先修復。
 3. `MockLocationManager` 與部分註解內有亂碼註解，閱讀維護成本較高。
-4. 已補上目前位置快照節流策略與程序內即時狀態的單元測試；前景服務與 mock provider 的完整生命週期仍需儀器測試或實機驗證。
+4. 已補上目前位置快照節流策略與程序內即時狀態的單元測試；前景服務與 mock provider 的完整生命週期仍未有儀器測試驗證，本次依需求不使用實機驗證。
 5. `WRITE_EXTERNAL_STORAGE` 對目前 Android 新版本價值有限，未來可評估是否仍需要保留。
 6. 地圖已從 osmdroid 改為 MapLibre；若未來要加入離線圖資、自訂 style 或更完整 annotation 功能，應優先沿用 MapLibre 生態系而不是混用兩套地圖 SDK。
 7. 目前 MapLibre `MapView` 是包在 Compose `AndroidView` 內，初始化時需要主動補 `onCreate`、`onStart`、`onResume`，否則首次進畫面可能只看到藍色底而沒有實際底圖。
@@ -251,7 +254,7 @@
 
 以下是本次巡檢確認到的優化候選與目前實作狀態：
 
-1. `MockLocationService` 已改成每 2 秒維持 mock provider 與程序內即時位置同步；漂移設定以 Flow 觀察，DataStore 位置快照則節流為每 30 秒一次，並在停止時補寫最後值；相關狀態 Flow 也會略過相同值的重複通知。
+1. `MockLocationService` 已改成每 2 秒維持 mock provider 與程序內即時位置同步；漂移設定以 Flow 觀察，DataStore 位置快照則節流為每 30 秒一次，並在停止時補寫最後值；相關狀態 Flow 也會略過相同值的重複通知。第 1 項 dispatcher 優化已完成：漂移計算使用 `Dispatchers.Default`，provider 操作使用序列化背景 dispatcher，並以 `Mutex`／`@Synchronized` 保護停止、重啟與銷毀順序。
 2. `MockLocationManager` 會對固定的四個 provider 逐一更新，即使某些裝置未成功建立 provider 也會每輪反覆進入例外處理；後續可只保留成功建立的 active providers，並保留失敗原因供診斷。
 3. `MainViewModel` 的自動啟動與最後位置載入是平行 coroutine，且以固定延遲等待；自動啟動檢查目前也未包含 GPS 狀態。後續可改成依明確初始化完成狀態啟動，並讓所有啟動入口共用完整前置條件檢查。
 4. 設定頁的漂移半徑、高度與自動停止分鐘數會在每次輸入變更時寫入 DataStore；後續可改為本地草稿值，通過格式／範圍驗證後於完成輸入或短暫 debounce 後提交。

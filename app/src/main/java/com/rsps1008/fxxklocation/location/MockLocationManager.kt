@@ -24,6 +24,7 @@ class MockLocationManager(private val context: Context) {
     )
 
     @SuppressLint("MissingPermission")
+    @Synchronized
     fun startMock() {
         providers.forEach { provider ->
             try {
@@ -55,6 +56,7 @@ class MockLocationManager(private val context: Context) {
         }
     }
 
+    @Synchronized
     fun stopMock() {
         providers.forEach { provider ->
             try {
@@ -65,6 +67,7 @@ class MockLocationManager(private val context: Context) {
         }
     }
 
+    @Synchronized
     fun updateMockLocation(locationData: LocationData) {
         val currentTime = System.currentTimeMillis()
         val elapsedNanos = SystemClock.elapsedRealtimeNanos()
