@@ -47,10 +47,10 @@
 
 - `compileSdk = 37`
 - `targetSdk = 36`
-- `minSdk = 31`
+- `minSdk = 28`
 - Java / Kotlin JVM target：`11`
-- Android Gradle Plugin：`9.0.1`
-- Kotlin：`2.0.21`
+- Android Gradle Plugin：`9.3.2`
+- Kotlin：`2.4.10`
 - AGP 9 已內建 Kotlin；不要再套用 `org.jetbrains.kotlin.android`，Compose compiler plugin 仍由版本目錄管理。
 - AGP 9 下 Kotlin JVM 目標使用 `kotlin { compilerOptions { ... } }`，不再使用已移除的 `kotlinOptions` DSL。
 - Compose 使用的 `LocalLifecycleOwner` 來自 `androidx.lifecycle:lifecycle-runtime-compose`；Material 返回圖示使用 AutoMirrored 版本。
@@ -156,16 +156,19 @@
   - `centerMapOnCurrentLocation()` 在 mock 狀態下只使用目前已知的 mock/current 快照；非 mock 狀態下會主動請求 current location。整個流程都不會覆寫 `selectedLocation`，且只有定位失敗時才提示訊息。
   - 使用字串資源發送 toast 訊息，避免語言切換後還有硬編碼英文提示。
   - 當 mock 狀態從 `true` 切到 `false` 時，會自動啟動一輪真實定位查詢，優先 current location，失敗才 fallback 到 last known。
+  - 若程序內仍有 mock 即時位置，會忽略已排隊但較晚回來的真實定位回呼，避免覆寫 mock UI 狀態、camera 或 DataStore 快照。
 
 - `app/src/main/java/com/rsps1008/fxxklocation/viewmodel/SettingsViewModel.kt`
   - 將 `SettingsStore` 中的設定轉成 UI 可觀察狀態。
   - 更新設定值。
   - 在需要時刷新真實海拔。
+  - 海拔刷新完成後只有在程序內沒有新的停止請求時才會恢復 mock，避免停止期間的延遲定位回呼把服務重新啟動。
 
 ### 資料與設定層
 
 - `app/src/main/java/com/rsps1008/fxxklocation/data/store/SettingsStore.kt`
   - 使用 DataStore Preferences 保存設定與最後位置。
+  - 提供 `setCurrentLocationAndStopMocking()`，讓停止時的最後位置與 `isMocking=false` 以單一交易保存。
   - 目前保存內容包含：
     - 是否啟用漂移
     - 漂移半徑
@@ -180,12 +183,21 @@
 - `app/src/main/java/com/rsps1008/fxxklocation/data/model/LocationData.kt`
   - 單純的定位資料模型，包含經度、緯度、海拔。
 
+- `app/src/main/java/com/rsps1008/fxxklocation/data/state/MockLocationRuntimeState.kt`
+  - 提供 mock 服務與主畫面 ViewModel 之間的程序內即時位置 StateFlow，以及不需等待 DataStore 的 stop-request 標記；程序重建時仍由 DataStore 快照作為 fallback。
+
+- `app/src/main/java/com/rsps1008/fxxklocation/data/store/CurrentLocationSnapshotPolicy.kt`
+  - 控制目前 mock 位置的 DataStore 快照頻率，使用單調時間並支援每次服務啟動重新計算週期。
+
 ### 定位與系統整合
 
 - `app/src/main/java/com/rsps1008/fxxklocation/service/MockLocationService.kt`
   - 前景服務核心。
   - 接收 start / stop / pause / resume action。
   - 啟動後持續推送 mock location。
+  - mock provider 仍每 2 秒更新；目前位置會先透過 `MockLocationRuntimeState` 在程序內即時同步給主畫面，再以 DataStore 初次、每 30 秒一次及停止時最後一次的節奏保存快照。
+  - 停止時會以單一 DataStore transaction 同時保存最後位置並清除 `isMocking`，避免 ViewModel 提前寫入狀態造成競態。
+  - 服務內的設定觀察採用 supervisor scope，各觀察支線會記錄例外而不直接留下未清理的 mock provider；停止寫入以 `stopSelfResult(startId)` 避免舊停止請求終止較新的啟動。
   - 內含自動停止倒數與通知更新邏輯。
 
 - `app/src/main/java/com/rsps1008/fxxklocation/location/MockLocationManager.kt`
@@ -224,7 +236,7 @@
 1. `README.md` 的繁體中文段落目前顯示亂碼，推測是檔案編碼有問題。
 2. `app/src/main/res/values-zh-rTW/strings.xml` 目前內容也有明顯亂碼，且看起來 XML 本身可能已損壞，後續若要正式支援繁中顯示，建議優先修復。
 3. `MockLocationManager` 與部分註解內有亂碼註解，閱讀維護成本較高。
-4. 專案目前測試檔仍是範本檔，尚未看到與核心 mock 邏輯對應的測試。
+4. 已補上目前位置快照節流策略與程序內即時狀態的單元測試；前景服務與 mock provider 的完整生命週期仍需儀器測試或實機驗證。
 5. `WRITE_EXTERNAL_STORAGE` 對目前 Android 新版本價值有限，未來可評估是否仍需要保留。
 6. 地圖已從 osmdroid 改為 MapLibre；若未來要加入離線圖資、自訂 style 或更完整 annotation 功能，應優先沿用 MapLibre 生態系而不是混用兩套地圖 SDK。
 7. 目前 MapLibre `MapView` 是包在 Compose `AndroidView` 內，初始化時需要主動補 `onCreate`、`onStart`、`onResume`，否則首次進畫面可能只看到藍色底而沒有實際底圖。
@@ -235,18 +247,18 @@
 12. 目前程式碼沒有看到付費、訂閱、廣告、遊戲或自有後端；因此使用者貼出的 Brazil / Japan / Korea 商家或付款類要求，多半只會在之後加入 IAP、付費版本或開發者帳戶條件符合時才會真正觸發。Vietnam 的網遊授權規定則與目前這個 mock location App 無直接關聯。
 12. 近期已將對外品牌改為 `Fake Location`；若要送審或重新上架，請同步確認 app 名稱、網站標題、隱私權頁、截圖與任何商店 metadata 都沒有殘留不雅字樣。
 
-## 2026-08-29 靜態優化巡檢補充
+## 2026-08-29 靜態優化巡檢與實作補充
 
-以下是本次只讀巡檢確認到、尚未實作的優化候選：
+以下是本次巡檢確認到的優化候選與目前實作狀態：
 
-1. `MockLocationService` 目前每 2 秒重新讀取漂移設定，並將目前位置寫入 DataStore；啟用漂移時會持續造成持久化寫入與 UI 狀態更新。後續可改成服務內維持即時狀態，設定以單一快照／Flow 觀察，位置以節流頻率保存並在停止時補寫最後值。
+1. `MockLocationService` 已改成每 2 秒維持 mock provider 與程序內即時位置同步；漂移設定以 Flow 觀察，DataStore 位置快照則節流為每 30 秒一次，並在停止時補寫最後值；相關狀態 Flow 也會略過相同值的重複通知。
 2. `MockLocationManager` 會對固定的四個 provider 逐一更新，即使某些裝置未成功建立 provider 也會每輪反覆進入例外處理；後續可只保留成功建立的 active providers，並保留失敗原因供診斷。
 3. `MainViewModel` 的自動啟動與最後位置載入是平行 coroutine，且以固定延遲等待；自動啟動檢查目前也未包含 GPS 狀態。後續可改成依明確初始化完成狀態啟動，並讓所有啟動入口共用完整前置條件檢查。
 4. 設定頁的漂移半徑、高度與自動停止分鐘數會在每次輸入變更時寫入 DataStore；後續可改為本地草稿值，通過格式／範圍驗證後於完成輸入或短暫 debounce 後提交。
-5. 位置查詢與套用邏輯在 `MainViewModel` 多處重複；停止模擬後的成功路徑另有重複更新 current location 的情況。後續可統一查詢、fallback 與狀態套用流程，避免重複 DataStore 寫入及事件發送；`currentLocations` 與部分未使用的 helper 也應一併確認是否可移除。
+5. 位置查詢與套用邏輯在 `MainViewModel` 多處重複；停止模擬後的成功路徑已移除重複更新 current location 的寫入，但查詢與 fallback 流程仍可後續統一；`currentLocations` 已移除，部分 helper 仍應一併確認是否可移除。
 6. `MainScreen` 的 MapLibre `MapView` 生命週期同時由 `AndroidView` factory 與 `DisposableEffect` 管理，並且使用已棄用的 Marker Annotation API；後續可先統一生命週期所有權，再評估改用目前支援的 annotation／source API。
-7. 目前 `testDebugUnitTest` 曾在舊的 AGP 8.13.2／Gradle 8.x 組合成功，但工作樹後來出現 AGP 9.0.1、Gradle 9.6.1 與 Kotlin plugin DSL 的未提交變更；這組建置工具鏈需先完成同一組合的驗證，不能混用舊測試結果判定目前設定已通過。
-8. 文件中的 `minSdk` 記載為 31，但 `app/build.gradle.kts` 實際設定為 28；後續應選定一個真實支援範圍並同步文件與測試矩陣。
+7. 目前建置工具鏈為 AGP 9.3.2、Gradle 9.7.1、Kotlin 2.4.10；本次修改後 `testDebugUnitTest` 與 `assembleDebug` 成功，`lintDebug` 仍受專案既有 12 個 errors 與 26 個 warnings 阻擋。
+8. `minSdk` 目前文件與 `app/build.gradle.kts` 都應以 28 為準；lint 仍會因此指出既有 API 30／31 呼叫需要版本防護。
 
 ## 建議的後續維護方向
 

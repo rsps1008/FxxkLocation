@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import com.rsps1008.fxxklocation.data.model.LocationData
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -58,7 +59,7 @@ class SettingsStore(private val context: Context) {
 
     val lastAltitudeValue: Flow<Double> = context.dataStore.data.map { preferences ->
         preferences[LAST_ALTITUDE_VALUE] ?: 3.0
-    }
+    }.distinctUntilChanged()
 
     val currentLocation: Flow<LocationData?> = context.dataStore.data.map { preferences ->
         val lat = preferences[CURRENT_LATITUDE]
@@ -68,11 +69,11 @@ class SettingsStore(private val context: Context) {
         } else {
             null
         }
-    }
+    }.distinctUntilChanged()
 
     val isMocking: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[IS_MOCKING] ?: false
-    }
+    }.distinctUntilChanged()
 
     val enableAutoStop: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[ENABLE_AUTO_STOP] ?: false
@@ -128,6 +129,17 @@ class SettingsStore(private val context: Context) {
             preferences[CURRENT_LATITUDE] = location.latitude
             preferences[CURRENT_LONGITUDE] = location.longitude
             preferences[CURRENT_ALTITUDE] = location.altitude
+        }
+    }
+
+    suspend fun setCurrentLocationAndStopMocking(location: LocationData?) {
+        context.dataStore.edit { preferences ->
+            location?.let {
+                preferences[CURRENT_LATITUDE] = it.latitude
+                preferences[CURRENT_LONGITUDE] = it.longitude
+                preferences[CURRENT_ALTITUDE] = it.altitude
+            }
+            preferences[IS_MOCKING] = false
         }
     }
 

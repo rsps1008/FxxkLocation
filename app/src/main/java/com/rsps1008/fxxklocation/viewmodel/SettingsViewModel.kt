@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import android.content.Intent
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.rsps1008.fxxklocation.data.state.MockLocationRuntimeState
 import com.rsps1008.fxxklocation.data.store.SettingsStore
 import com.rsps1008.fxxklocation.service.MockLocationService
 import com.rsps1008.fxxklocation.util.SystemCheckUtil
@@ -213,12 +214,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     private fun resumeMock() {
         viewModelScope.launch {
+            if (MockLocationRuntimeState.isStopRequested.value) return@launch
+
             val isMocking = settingsStore.isMocking.first()
             if (!isMocking) return@launch
 
             val lat = settingsStore.lastLatitude.first() ?: return@launch
             val lng = settingsStore.lastLongitude.first() ?: return@launch
             val alt = settingsStore.lastAltitudeValue.first()
+            if (MockLocationRuntimeState.isStopRequested.value) return@launch
             
             val intent = Intent(context, MockLocationService::class.java).apply {
                 action = MockLocationService.ACTION_START_MOCK

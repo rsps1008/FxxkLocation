@@ -9,24 +9,39 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.rsps1008.fxxklocation.MainActivity
+import com.rsps1008.fxxklocation.R
 import com.rsps1008.fxxklocation.data.model.LocationData
+import com.rsps1008.fxxklocation.data.state.MockLocationRuntimeState
+import com.rsps1008.fxxklocation.data.store.CurrentLocationSnapshotPolicy
 import com.rsps1008.fxxklocation.data.store.SettingsStore
 import com.rsps1008.fxxklocation.location.MockLocationManager
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import com.rsps1008.fxxklocation.R
-import com.rsps1008.fxxklocation.MainActivity
+import kotlinx.coroutines.supervisorScope
 
+@Suppress("LogNotTimber")
 class MockLocationService : Service() {
-    private val scope = CoroutineScope(Dispatchers.Main + Job())
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private lateinit var mockLocationManager: MockLocationManager
     private lateinit var settingsStore: SettingsStore
     private var mockJob: Job? = null
+    private var stopJob: Job? = null
+    private var latestMockLocation: LocationData? = null
+    private var stopRequested = false
+    private var latestStartId = 0
+    private val snapshotPolicy = CurrentLocationSnapshotPolicy(LOCATION_SNAPSHOT_INTERVAL_MILLIS)
 
     companion object {
         const val ACTION_START_MOCK = "ACTION_START_MOCK"
@@ -38,6 +53,8 @@ class MockLocationService : Service() {
         const val EXTRA_ALTITUDE = "EXTRA_ALTITUDE"
         private const val CHANNEL_ID = "MockLocationChannel"
         private const val NOTIFICATION_ID = 1
+        private const val LOCATION_SNAPSHOT_INTERVAL_MILLIS = 30_000L
+        private const val TAG = "MockLocationService"
     }
 
     override fun onCreate() {
@@ -49,18 +66,25 @@ class MockLocationService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent == null) return START_NOT_STICKY
+        latestStartId = startId
 
         when (intent.action) {
             ACTION_STOP_MOCK -> {
-                stopMocking()
+                stopMocking(startId)
                 return START_NOT_STICKY
             }
             ACTION_START_MOCK -> {
-                val notification = createNotification()
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
-                } else {
-                    startForeground(NOTIFICATION_ID, notification)
+                try {
+                    val notification = createNotification()
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+                    } else {
+                        startForeground(NOTIFICATION_ID, notification)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Unable to promote mock location service to foreground", e)
+                    stopMocking(startId)
+                    return START_NOT_STICKY
                 }
 
                 val lat = intent.getDoubleExtra(EXTRA_LATITUDE, 0.0)
@@ -81,60 +105,147 @@ class MockLocationService : Service() {
     private fun startMocking(initialCenter: LocationData) {
         var center = initialCenter
         var currentPosition = initialCenter
+        val driftConfigFlow = combine(
+            settingsStore.enableDrift,
+            settingsStore.driftRadius
+        ) { enabled, radius ->
+            DriftConfig(enabled, radius)
+        }.distinctUntilChanged()
+
+        stopJob?.cancel()
+        stopJob = null
         mockJob?.cancel()
+        stopRequested = false
+        MockLocationRuntimeState.clearStopRequest()
+        snapshotPolicy.reset()
+        latestMockLocation = initialCenter
+        MockLocationRuntimeState.update(initialCenter)
         mockLocationManager.startMock()
 
         mockJob = scope.launch {
-            // Auto-stop logic
-            launch {
-                val autoStop = settingsStore.enableAutoStop.first()
-                if (autoStop) {
-                    val minutes = settingsStore.autoStopMinutes.first()
-                    if (minutes > 0) {
-                        for (i in minutes downTo 1) {
-                            updateNotification(i)
-                            delay(60L * 1000L)
+            try {
+                var driftConfig = driftConfigFlow.first()
+
+                settingsStore.setIsMocking(true)
+
+                supervisorScope {
+                    launch {
+                        try {
+                            driftConfigFlow.collect { config ->
+                                driftConfig = config
+                            }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Drift settings observation stopped", e)
                         }
-                        stopMocking()
+                    }
+
+                    // Auto-stop logic
+                    launch {
+                        try {
+                            val autoStop = settingsStore.enableAutoStop.first()
+                            if (autoStop) {
+                                val minutes = settingsStore.autoStopMinutes.first()
+                                if (minutes > 0) {
+                                    for (i in minutes downTo 1) {
+                                        updateNotification(i)
+                                        delay(60L * 1000L)
+                                    }
+                                    stopMocking()
+                                }
+                            }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Auto-stop observation stopped", e)
+                        }
+                    }
+
+                    // Dynamically update altitude if it's changed in Settings or via real-refresh while mocking
+                    launch {
+                        try {
+                            settingsStore.lastAltitudeValue
+                                .distinctUntilChanged()
+                                .collect { alt ->
+                                    center = center.copy(altitude = alt)
+                                    currentPosition = currentPosition.copy(altitude = alt)
+                                    latestMockLocation = latestMockLocation?.copy(altitude = alt)
+                                }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Altitude observation stopped", e)
+                        }
+                    }
+
+                    while (true) {
+                        val locationToMock = if (driftConfig.enabled) {
+                            mockLocationManager.generateRandomWalkLocation(center, currentPosition, driftConfig.radius)
+                        } else {
+                            center
+                        }
+
+                        currentPosition = locationToMock
+                        latestMockLocation = locationToMock
+                        MockLocationRuntimeState.update(locationToMock)
+                        mockLocationManager.updateMockLocation(locationToMock)
+                        persistCurrentLocationIfDue(locationToMock)
+                        delay(2000)
                     }
                 }
-            }
-
-            // Dynamically update altitude if it's changed in Settings or via real-refresh while mocking
-            launch {
-                settingsStore.lastAltitudeValue.collect { alt ->
-                    center = center.copy(altitude = alt)
-                    currentPosition = currentPosition.copy(altitude = alt)
-                }
-            }
-
-            while (true) {
-                val enableDrift = settingsStore.enableDrift.first()
-                val radius = settingsStore.driftRadius.first()
-                
-                val locationToMock = if (enableDrift) {
-                    mockLocationManager.generateRandomWalkLocation(center, currentPosition, radius)
-                } else {
-                    center
-                }
-
-                currentPosition = locationToMock
-                
-                mockLocationManager.updateMockLocation(locationToMock)
-                settingsStore.setCurrentLocation(locationToMock)
-                delay(2000)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "Mock location loop stopped unexpectedly", e)
+                stopMocking()
             }
         }
     }
 
-    private fun stopMocking() {
+    private fun stopMocking(stopStartId: Int = latestStartId) {
+        if (stopRequested) return
+        stopRequested = true
         mockJob?.cancel()
         mockLocationManager.stopMock()
-        scope.launch {
-            settingsStore.setIsMocking(false)
+        MockLocationRuntimeState.requestStop()
+        MockLocationRuntimeState.clear()
+        val finalLocation = latestMockLocation
+        latestMockLocation = null
+        stopJob = scope.launch {
+            try {
+                settingsStore.setCurrentLocationAndStopMocking(finalLocation)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to persist the final mock location", e)
+                try {
+                    settingsStore.setIsMocking(false)
+                } catch (fallbackError: CancellationException) {
+                    throw fallbackError
+                } catch (fallbackError: Exception) {
+                    Log.e(TAG, "Failed to clear the mocking state after persistence failure", fallbackError)
+                }
+            }
+            stopSelfResult(stopStartId)
         }
         stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+    }
+
+    private suspend fun persistCurrentLocationIfDue(location: LocationData) {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (!snapshotPolicy.shouldPersist(now)) return
+
+        try {
+            settingsStore.setCurrentLocation(location)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to persist a mock location snapshot", e)
+        }
+        // Throttle failed attempts too, so a persistent DataStore error does
+        // not turn the two-second mock loop into repeated I/O and logging.
+        snapshotPolicy.markAttempted(now)
     }
 
     private fun createNotification(remainingMinutes: Int? = null): Notification {
@@ -197,7 +308,15 @@ class MockLocationService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        super.onDestroy()
         mockJob?.cancel()
+        mockLocationManager.stopMock()
+        MockLocationRuntimeState.clear()
+        scope.cancel()
+        super.onDestroy()
     }
+
+    private data class DriftConfig(
+        val enabled: Boolean = false,
+        val radius: Double = 10.0
+    )
 }

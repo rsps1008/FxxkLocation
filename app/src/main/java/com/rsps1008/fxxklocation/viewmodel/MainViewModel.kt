@@ -16,6 +16,7 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.rsps1008.fxxklocation.R
 import com.rsps1008.fxxklocation.data.model.LocationData
+import com.rsps1008.fxxklocation.data.state.MockLocationRuntimeState
 import com.rsps1008.fxxklocation.data.store.SettingsStore
 import com.rsps1008.fxxklocation.service.MockLocationService
 import com.rsps1008.fxxklocation.util.SystemCheckUtil
@@ -69,9 +70,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _cameraLocations = MutableSharedFlow<Location>(extraBufferCapacity = 1)
     val cameraLocations = _cameraLocations.asSharedFlow()
-
-    private val _currentLocations = MutableSharedFlow<LocationData>(extraBufferCapacity = 1)
-    val currentLocations = _currentLocations.asSharedFlow()
 
     private val _currentLocation = MutableStateFlow<LocationData?>(null)
     val currentLocation = _currentLocation.asStateFlow()
@@ -140,10 +138,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun syncCurrentLocation() {
         viewModelScope.launch {
             settingsStore.currentLocation.collect { location ->
-                location?.let {
-                    _currentLocation.value = it
-                    _currentLocations.tryEmit(it)
+                // While mocking, the in-process runtime state is fresher than the
+                // periodic DataStore snapshot. DataStore remains the fallback for
+                // process/UI recreation when no live service state is available.
+                if (MockLocationRuntimeState.currentLocation.value == null) {
+                    location?.let {
+                        _currentLocation.value = it
+                    }
                 }
+            }
+        }
+
+        viewModelScope.launch {
+            MockLocationRuntimeState.currentLocation.collect { location ->
+                location?.let { _currentLocation.value = it }
             }
         }
     }
@@ -260,9 +268,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun resumeMockAfterRefresh() {
         viewModelScope.launch {
+            if (MockLocationRuntimeState.isStopRequested.value) return@launch
+
             val lastLat = settingsStore.lastLatitude.first() ?: return@launch
             val lastLng = settingsStore.lastLongitude.first() ?: return@launch
             val lastAlt = settingsStore.lastAltitudeValue.first()
+            if (MockLocationRuntimeState.isStopRequested.value) return@launch
             
             val intent = Intent(context, MockLocationService::class.java).apply {
                 action = MockLocationService.ACTION_START_MOCK
@@ -282,11 +293,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun updateCurrentLocation(location: Location) {
+        // A real-location callback may have been queued before mocking started.
+        // Do not let it overwrite the live mock state or its durable snapshot.
+        if (MockLocationRuntimeState.currentLocation.value != null) return
+
         val currentLocation = LocationData(location.latitude, location.longitude, location.altitude)
         _currentLocation.value = currentLocation
-        _currentLocations.tryEmit(currentLocation)
         viewModelScope.launch {
-            settingsStore.setCurrentLocation(currentLocation)
+            if (MockLocationRuntimeState.currentLocation.value == null) {
+                settingsStore.setCurrentLocation(currentLocation)
+            }
         }
     }
 
@@ -532,6 +548,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         updateSelectedTarget: Boolean = false,
         updateAltitudeFromLocation: Boolean = false
     ) {
+        // Ignore real-location callbacks that were queued before mocking began;
+        // they must not move the camera away from the active mock position.
+        if (MockLocationRuntimeState.currentLocation.value != null) return
+
         emitCameraLocation(location)
         updateCurrentLocation(location)
         if (updateSelectedTarget) {
@@ -596,20 +616,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             putExtra(MockLocationService.EXTRA_ALTITUDE, selectedLocation.altitude)
         }
         context.startForegroundService(intent)
-        viewModelScope.launch {
-            settingsStore.setIsMocking(true)
-        }
         _isApplied.value = true
     }
 
     fun stopMock() {
+        MockLocationRuntimeState.requestStop()
         val intent = Intent(context, MockLocationService::class.java).apply {
             action = MockLocationService.ACTION_STOP_MOCK
         }
         context.startService(intent)
-        viewModelScope.launch {
-            settingsStore.setIsMocking(false)
-        }
+        // Let the service atomically persist its final location and clear the
+        // mocking flag. Writing the flag here could race that final snapshot.
         _isApplied.value = false
     }
 
@@ -625,7 +642,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
                         .addOnSuccessListener { location ->
                             if (location != null) {
-                                updateCurrentLocation(location)
                                 applyLocatedPosition(
                                     location = location,
                                     successMessageRes = null,
@@ -668,7 +684,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         context.mainExecutor
                     ) { location ->
                         if (location != null) {
-                            updateCurrentLocation(location)
                             applyLocatedPosition(
                                 location = location,
                                 successMessageRes = null,
