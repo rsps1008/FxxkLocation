@@ -157,7 +157,8 @@
   - 讀取最後定位。
   - 啟停 `MockLocationService`。
   - 處理自動啟動、定位自己、刷新真實海拔。
-  - 目前多了一個 `hasLoadedInitialSelectedLocation` 狀態，供 `MainScreen` 判斷初始鏡頭是否可以套用；這個狀態必須在讀完儲存的最後釘選點之後才會設為 `true`。
+  - `hasLoadedInitialSelectedLocation` 以 StateFlow 提供給 `MainScreen` 判斷初始鏡頭是否可以套用；這個狀態必須在讀完儲存的最後釘選點與高度之後才會設為 `true`。
+  - 自動啟動會等待初始位置讀取與首次系統狀態檢查的明確 readiness，不再依賴固定延遲；若 DataStore 初始讀取失敗會安全結束等待。啟動前會核對 DataStore 的 `isMocking`、程序內 mock 狀態及原有必要條件，並以程序內 atomic claim 避免多個 ViewModel 重複送出啟動請求。
   - `centerMapOnCurrentLocation()` 在 mock 狀態下只使用目前已知的 mock/current 快照；非 mock 狀態下會主動請求 current location。整個流程都不會覆寫 `selectedLocation`，且只有定位失敗時才提示訊息。
   - 使用字串資源發送 toast 訊息，避免語言切換後還有硬編碼英文提示。
   - 當 mock 狀態從 `true` 切到 `false` 時，會自動啟動一輪真實定位查詢，優先 current location，失敗才 fallback 到 last known。
@@ -263,7 +264,7 @@
 
 1. `MockLocationService` 已改成每 2 秒維持 mock provider 與程序內即時位置同步；漂移設定以 Flow 觀察，DataStore 位置快照則節流為每 30 秒一次，並在停止時補寫最後值；相關狀態 Flow 也會略過相同值的重複通知。第 1 項 dispatcher 優化已完成：漂移計算使用 `Dispatchers.Default`，provider 操作使用序列化背景 dispatcher，並以 `Mutex`／`@Synchronized` 保護停止、重啟與銷毀順序。
 2. `MockLocationManager` 的 active provider 優化已完成：固定四個 provider 仍依原順序嘗試建立，但只有成功建立並啟用者會進入 `activeProviders`；更新只遍歷成功清單，停止清空，初始化失敗則記錄原因。
-3. `MainViewModel` 的自動啟動與最後位置載入是平行 coroutine，且以固定延遲等待；自動啟動檢查目前也未包含 GPS 狀態。後續可改成依明確初始化完成狀態啟動，並讓所有啟動入口共用完整前置條件檢查。
+3. `MainViewModel` 的自動啟動 readiness 優化已完成：初始位置／高度載入與首次系統狀態檢查以 StateFlow 表示，移除固定延遲並處理失敗終止；自動啟動仍保留原本四個必要條件與不檢查 GPS 的既有行為，並以 DataStore／程序內狀態與 atomic claim 避免重複啟動。
 4. 設定頁數字輸入的 DataStore 寫入優化已完成：三個欄位各自維護可保存的本地草稿，通過原有解析規則後於失焦、IME Done、短暫 debounce 或 dispose 提交，並保留編輯中的暫時字串與外部回讀隔離。
 5. 位置查詢與套用邏輯在 `MainViewModel` 多處重複；停止模擬後的成功路徑已移除重複更新 current location 的寫入，但查詢與 fallback 流程仍可後續統一；`currentLocations` 已移除，部分 helper 仍應一併確認是否可移除。
 6. `MainScreen` 的 MapLibre `MapView` 生命週期同時由 `AndroidView` factory 與 `DisposableEffect` 管理，並且使用已棄用的 Marker Annotation API；後續可先統一生命週期所有權，再評估改用目前支援的 annotation／source API。

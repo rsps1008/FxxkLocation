@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -33,17 +34,30 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.util.concurrent.atomic.AtomicBoolean
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
+    companion object {
+        private val autoStartClaimed = AtomicBoolean(false)
+    }
+
     private val context = application.applicationContext
     private val settingsStore = SettingsStore(context)
 
     var selectedLocation by mutableStateOf(LocationData(25.0330, 121.5654)) // Default to Taipei 101
         private set
 
-    var hasLoadedInitialSelectedLocation by mutableStateOf(false)
-        private set
+    private val _hasLoadedInitialSelectedLocation = MutableStateFlow(false)
+    val hasLoadedInitialSelectedLocation = _hasLoadedInitialSelectedLocation.asStateFlow()
 
+    private val _hasCompletedInitialLocationLoad = MutableStateFlow(false)
+    private val _hasCheckedSystemStatus = MutableStateFlow(false)
+    private val autoStartReadiness = combine(
+        _hasCompletedInitialLocationLoad,
+        _hasCheckedSystemStatus
+    ) { locationLoadCompleted, systemStatusChecked ->
+        locationLoadCompleted && systemStatusChecked
+    }
     private val _isMocking = MutableStateFlow(false)
     val isMocking = _isMocking.asStateFlow()
 
@@ -86,13 +100,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun checkAutoStart() {
         viewModelScope.launch {
             val autoStart = settingsStore.autoStartOnLaunch.first()
-            if (autoStart) {
-                // Wait for checkStatus to complete and ensure all permissions/settings are OK
-                delay(1000) 
-                if (_isMockAppSet.value && _hasPermission.value && _isIgnoringBatteryOptimizations.value && _hasNotificationPermission.value) {
-                    startMock()
-                }
+            if (!autoStart) return@launch
+
+            autoStartReadiness.first { it }
+
+            val isMockingInStore = settingsStore.isMocking.first()
+            if (!canAutoStart(
+                    autoStartEnabled = autoStart,
+                    initialLocationLoaded = _hasLoadedInitialSelectedLocation.value,
+                    systemStatusChecked = _hasCheckedSystemStatus.value,
+                    isMocking = isMockingInStore,
+                    isApplied = _isApplied.value,
+                    hasRuntimeMockLocation = MockLocationRuntimeState.currentLocation.value != null,
+                    isMockAppSet = _isMockAppSet.value,
+                    hasPermission = _hasPermission.value,
+                    isIgnoringBatteryOptimizations = _isIgnoringBatteryOptimizations.value,
+                    hasNotificationPermission = _hasNotificationPermission.value
+                )
+            ) {
+                return@launch
             }
+
+            if (!autoStartClaimed.compareAndSet(false, true)) return@launch
+            startMock()
         }
     }
 
@@ -114,16 +144,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun loadLastLocation() {
         viewModelScope.launch {
-            val lastLat = settingsStore.lastLatitude.first()
-            val lastLng = settingsStore.lastLongitude.first()
-            if (lastLat != null && lastLng != null) {
-                selectedLocation = selectedLocation.copy(latitude = lastLat, longitude = lastLng)
-            }
-            hasLoadedInitialSelectedLocation = true
+            try {
+                val lastLat = settingsStore.lastLatitude.first()
+                val lastLng = settingsStore.lastLongitude.first()
+                val lastAltitude = settingsStore.lastAltitudeValue.first()
+                selectedLocation = selectedLocation.copy(altitude = lastAltitude)
+                if (lastLat != null && lastLng != null) {
+                    selectedLocation = selectedLocation.copy(latitude = lastLat, longitude = lastLng)
+                }
+                _hasLoadedInitialSelectedLocation.value = true
 
-            // If "use real altitude" is enabled, refresh it on start
-            if (settingsStore.useRealAltitude.first()) {
-                refreshRealAltitude()
+                // If "use real altitude" is enabled, refresh it on start
+                if (settingsStore.useRealAltitude.first()) {
+                    refreshRealAltitude()
+                }
+            } finally {
+                _hasCompletedInitialLocationLoad.value = true
             }
         }
 
@@ -307,11 +343,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun checkStatus() {
-        _hasPermission.value = SystemCheckUtil.hasLocationPermission(context)
-        _isGpsEnabled.value = SystemCheckUtil.isGpsEnabled(context)
-        _isMockAppSet.value = SystemCheckUtil.isMockLocationEnabled(context)
-        _hasNotificationPermission.value = SystemCheckUtil.hasNotificationPermission(context)
-        _isIgnoringBatteryOptimizations.value = SystemCheckUtil.isIgnoringBatteryOptimizations(context)
+        try {
+            _hasPermission.value = SystemCheckUtil.hasLocationPermission(context)
+            _isGpsEnabled.value = SystemCheckUtil.isGpsEnabled(context)
+            _isMockAppSet.value = SystemCheckUtil.isMockLocationEnabled(context)
+            _hasNotificationPermission.value = SystemCheckUtil.hasNotificationPermission(context)
+            _isIgnoringBatteryOptimizations.value = SystemCheckUtil.isIgnoringBatteryOptimizations(context)
+        } finally {
+            _hasCheckedSystemStatus.value = true
+        }
     }
 
     fun refreshStatusAfterTransition() {
@@ -713,3 +753,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 }
+
+internal fun canAutoStart(
+    autoStartEnabled: Boolean,
+    initialLocationLoaded: Boolean,
+    systemStatusChecked: Boolean,
+    isMocking: Boolean,
+    isApplied: Boolean,
+    hasRuntimeMockLocation: Boolean,
+    isMockAppSet: Boolean,
+    hasPermission: Boolean,
+    isIgnoringBatteryOptimizations: Boolean,
+    hasNotificationPermission: Boolean
+): Boolean = autoStartEnabled &&
+    initialLocationLoaded &&
+    systemStatusChecked &&
+    !isMocking &&
+    !isApplied &&
+    !hasRuntimeMockLocation &&
+    isMockAppSet &&
+    hasPermission &&
+    isIgnoringBatteryOptimizations &&
+    hasNotificationPermission

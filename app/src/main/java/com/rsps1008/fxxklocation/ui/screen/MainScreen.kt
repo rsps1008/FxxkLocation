@@ -64,7 +64,7 @@ fun MainScreen(
     val isMocking by viewModel.isMocking.collectAsState()
     val isApplied by viewModel.isApplied.collectAsState()
     val currentLocation by viewModel.currentLocation.collectAsState()
-    val hasLoadedInitialSelectedLocation = viewModel.hasLoadedInitialSelectedLocation
+    val hasLoadedInitialSelectedLocation by viewModel.hasLoadedInitialSelectedLocation.collectAsState()
     
     val lifecycleOwner = LocalLifecycleOwner.current
     val focusManager = LocalFocusManager.current
