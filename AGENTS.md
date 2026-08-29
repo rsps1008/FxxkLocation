@@ -45,12 +45,16 @@
 
 ### 基本環境
 
-- `compileSdk = 36`
+- `compileSdk = 37`
 - `targetSdk = 36`
 - `minSdk = 31`
 - Java / Kotlin JVM target：`11`
-- Android Gradle Plugin：`8.13.2`
+- Android Gradle Plugin：`9.0.1`
 - Kotlin：`2.0.21`
+- AGP 9 已內建 Kotlin；不要再套用 `org.jetbrains.kotlin.android`，Compose compiler plugin 仍由版本目錄管理。
+- AGP 9 下 Kotlin JVM 目標使用 `kotlin { compilerOptions { ... } }`，不再使用已移除的 `kotlinOptions` DSL。
+- Compose 使用的 `LocalLifecycleOwner` 來自 `androidx.lifecycle:lifecycle-runtime-compose`；Material 返回圖示使用 AutoMirrored 版本。
+- MapLibre 13.6.0 的舊 annotations Marker API 目前仍被地圖標記流程使用，編譯時會產生 deprecated warnings，待改用新版 annotation/plugin API 時再一併調整。
 
 ### 常用指令
 
@@ -230,6 +234,19 @@
 11. `docs/index.html` 與 `docs/privacy-policy/index.html` 屬於對外公開頁面，內容需要隨 App 實際功能同步更新，尤其是資料儲存、定位使用與第三方服務說明。
 12. 目前程式碼沒有看到付費、訂閱、廣告、遊戲或自有後端；因此使用者貼出的 Brazil / Japan / Korea 商家或付款類要求，多半只會在之後加入 IAP、付費版本或開發者帳戶條件符合時才會真正觸發。Vietnam 的網遊授權規定則與目前這個 mock location App 無直接關聯。
 12. 近期已將對外品牌改為 `Fake Location`；若要送審或重新上架，請同步確認 app 名稱、網站標題、隱私權頁、截圖與任何商店 metadata 都沒有殘留不雅字樣。
+
+## 2026-08-29 靜態優化巡檢補充
+
+以下是本次只讀巡檢確認到、尚未實作的優化候選：
+
+1. `MockLocationService` 目前每 2 秒重新讀取漂移設定，並將目前位置寫入 DataStore；啟用漂移時會持續造成持久化寫入與 UI 狀態更新。後續可改成服務內維持即時狀態，設定以單一快照／Flow 觀察，位置以節流頻率保存並在停止時補寫最後值。
+2. `MockLocationManager` 會對固定的四個 provider 逐一更新，即使某些裝置未成功建立 provider 也會每輪反覆進入例外處理；後續可只保留成功建立的 active providers，並保留失敗原因供診斷。
+3. `MainViewModel` 的自動啟動與最後位置載入是平行 coroutine，且以固定延遲等待；自動啟動檢查目前也未包含 GPS 狀態。後續可改成依明確初始化完成狀態啟動，並讓所有啟動入口共用完整前置條件檢查。
+4. 設定頁的漂移半徑、高度與自動停止分鐘數會在每次輸入變更時寫入 DataStore；後續可改為本地草稿值，通過格式／範圍驗證後於完成輸入或短暫 debounce 後提交。
+5. 位置查詢與套用邏輯在 `MainViewModel` 多處重複；停止模擬後的成功路徑另有重複更新 current location 的情況。後續可統一查詢、fallback 與狀態套用流程，避免重複 DataStore 寫入及事件發送；`currentLocations` 與部分未使用的 helper 也應一併確認是否可移除。
+6. `MainScreen` 的 MapLibre `MapView` 生命週期同時由 `AndroidView` factory 與 `DisposableEffect` 管理，並且使用已棄用的 Marker Annotation API；後續可先統一生命週期所有權，再評估改用目前支援的 annotation／source API。
+7. 目前 `testDebugUnitTest` 曾在舊的 AGP 8.13.2／Gradle 8.x 組合成功，但工作樹後來出現 AGP 9.0.1、Gradle 9.6.1 與 Kotlin plugin DSL 的未提交變更；這組建置工具鏈需先完成同一組合的驗證，不能混用舊測試結果判定目前設定已通過。
+8. 文件中的 `minSdk` 記載為 31，但 `app/build.gradle.kts` 實際設定為 28；後續應選定一個真實支援範圍並同步文件與測試矩陣。
 
 ## 建議的後續維護方向
 

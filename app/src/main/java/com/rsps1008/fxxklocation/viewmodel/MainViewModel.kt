@@ -188,7 +188,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     null
                 } ?: continue
 
-                if (bestLocation == null || location.accuracy < bestLocation!!.accuracy) {
+                if (bestLocation == null || location.accuracy < bestLocation.accuracy) {
                     bestLocation = location
                 }
             }
@@ -512,7 +512,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 null
             } ?: continue
 
-            if (bestLocation == null || location.accuracy < bestLocation!!.accuracy) {
+            if (bestLocation == null || location.accuracy < bestLocation.accuracy) {
                 bestLocation = location
             }
         }
