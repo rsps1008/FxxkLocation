@@ -17,10 +17,14 @@ class AutoStartReadinessTest {
     }
 
     @Test
-    fun autoStartIsRejectedWhenMockIsAlreadyRunningOrApplied() {
-        assertFalse(eligible(isMocking = true))
+    fun autoStartIsRejectedWhenMockIsAlreadyAppliedOrRuntimeStateIsPresent() {
         assertFalse(eligible(isApplied = true))
         assertFalse(eligible(hasRuntimeMockLocation = true))
+    }
+
+    @Test
+    fun autoStartIsRejectedWhileStopPersistenceIsStillInProgressAfterViewModelRecreation() {
+        assertFalse(eligible(isStopRequested = true))
     }
 
     @Test
@@ -36,9 +40,9 @@ class AutoStartReadinessTest {
         autoStartEnabled: Boolean = true,
         initialLocationLoaded: Boolean = true,
         systemStatusChecked: Boolean = true,
-        isMocking: Boolean = false,
         isApplied: Boolean = false,
         hasRuntimeMockLocation: Boolean = false,
+        isStopRequested: Boolean = false,
         isMockAppSet: Boolean = true,
         hasPermission: Boolean = true,
         isIgnoringBatteryOptimizations: Boolean = true,
@@ -47,9 +51,9 @@ class AutoStartReadinessTest {
         autoStartEnabled = autoStartEnabled,
         initialLocationLoaded = initialLocationLoaded,
         systemStatusChecked = systemStatusChecked,
-        isMocking = isMocking,
         isApplied = isApplied,
         hasRuntimeMockLocation = hasRuntimeMockLocation,
+        isStopRequested = isStopRequested,
         isMockAppSet = isMockAppSet,
         hasPermission = hasPermission,
         isIgnoringBatteryOptimizations = isIgnoringBatteryOptimizations,

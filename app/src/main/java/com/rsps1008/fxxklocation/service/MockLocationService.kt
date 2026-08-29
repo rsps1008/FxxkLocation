@@ -269,6 +269,9 @@ class MockLocationService : Service() {
                     Log.e(TAG, "Failed to clear the mocking state after persistence failure", fallbackError)
                 }
             }
+            // The stop transaction (or its fallback) has completed. A new
+            // ViewModel may now evaluate auto-start again.
+            MockLocationRuntimeState.clearStopRequest()
             stopSelfResult(stopStartId)
         }
         stopForeground(STOP_FOREGROUND_REMOVE)

@@ -112,14 +112,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             autoStartReadiness.first { it }
 
-            val isMockingInStore = settingsStore.isMocking.first()
+            // A persisted true value may be stale after the process or service
+            // was killed. Only live in-process state can suppress a duplicate
+            // start; the service will restore the durable flag when it starts.
             if (!canAutoStart(
                     autoStartEnabled = autoStart,
                     initialLocationLoaded = _hasLoadedInitialSelectedLocation.value,
                     systemStatusChecked = _hasCheckedSystemStatus.value,
-                    isMocking = isMockingInStore,
                     isApplied = _isApplied.value,
                     hasRuntimeMockLocation = MockLocationRuntimeState.currentLocation.value != null,
+                    isStopRequested = MockLocationRuntimeState.isStopRequested.value,
                     isMockAppSet = _isMockAppSet.value,
                     hasPermission = _hasPermission.value,
                     isIgnoringBatteryOptimizations = _isIgnoringBatteryOptimizations.value,
@@ -801,9 +803,9 @@ internal fun canAutoStart(
     autoStartEnabled: Boolean,
     initialLocationLoaded: Boolean,
     systemStatusChecked: Boolean,
-    isMocking: Boolean,
     isApplied: Boolean,
     hasRuntimeMockLocation: Boolean,
+    isStopRequested: Boolean,
     isMockAppSet: Boolean,
     hasPermission: Boolean,
     isIgnoringBatteryOptimizations: Boolean,
@@ -811,9 +813,9 @@ internal fun canAutoStart(
 ): Boolean = autoStartEnabled &&
     initialLocationLoaded &&
     systemStatusChecked &&
-    !isMocking &&
     !isApplied &&
     !hasRuntimeMockLocation &&
+    !isStopRequested &&
     isMockAppSet &&
     hasPermission &&
     isIgnoringBatteryOptimizations &&
