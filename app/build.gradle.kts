@@ -11,8 +11,8 @@ android {
         applicationId = "com.rsps1008.fxxklocation"
         minSdk = 31
         targetSdk = 37
-        versionCode = 18
-        versionName = "1.8"
+        versionCode = 19
+        versionName = "1.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
