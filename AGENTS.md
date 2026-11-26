@@ -145,6 +145,9 @@
 
 - `docs/index.html`
   - GitHub Pages 風格的專案首頁。
+- `docs/CNAME`
+  - GitHub Pages 自訂網域為 `fxxklocation.rsps1008.space`；網站頁面的 canonical URL 應指向此網域。
+- `docs/index.html` 與 `docs/privacy-policy/index.html` 均已設定各自頁面的 HTTPS canonical URL。
 - 目前內容用來介紹 Fake Location 的核心功能、使用前置條件與隱私政策入口。
 - `docs/privacy-policy/index.html`
   - 對外公開的隱私權政策頁面。
